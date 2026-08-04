@@ -1,0 +1,497 @@
+@import "tailwindcss";
+
+/* TT Hooves (TypeType, licensed) — drop the files in /public/fonts and this
+   picks them up. Falls back to Helvetica/Arial until they're present. */
+@font-face {
+  font-family: "TT Hooves";
+  src: url("/fonts/TTHoves-Medium.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* body stays Noto Sans for readability; headings + subheadings use Helvetica
+     (Arial as the practical fallback on Windows), differentiated by weight */
+  --font-sans: "Noto Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "TT Hooves", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  /* Teask brand palette, navy + teal retained per brief; base deepened
+     toward the near-black of the brand boards for stronger contrast */
+  --color-navy-950: #05070e;
+  --color-navy-900: #0a0f22;
+  --color-navy-800: #141d3d;
+  --color-navy-700: #223163;
+  --color-teal-brand: #3bb1e3;
+  /* the brand teal taken right down, for scrims that have to sit over a
+     teal-brand surface and still carry white type. Same hue family (~195deg),
+     roughly 12:1 against white, where teal-brand itself is only 2.4:1. */
+  --color-teal-deep: #04384e;
+  --color-blue-brand: #0084d6;
+  --color-blue-deep: #0075be;
+  --color-pale-brand: #bfd1ff;
+  --color-solar: #f2a93b;
+  /* light-theme surfaces: off-white paper base + silver for gradients/hairlines;
+     sections alternate white and paper so the page reads in layers */
+  --color-paper: #f3f5f8;
+  --color-silver: #e2e7ee;
+
+  /* ── fluid type ──────────────────────────────────────────────────────────
+     Tailwind's largest breakpoint is 1536, so every display from a 1536 laptop
+     to a 3840 4K panel was being served the same 52px heading and 80px hero.
+     These scale continuously with the viewport instead of stepping, so there is
+     no width that falls between two sizes and looks wrong.
+
+     Each is clamp(floor, slope, ceiling). The ceiling matters as much as the
+     floor: type keyed to vw with no cap keeps growing past the point where it
+     is doing any good, and the shell stops widening at 1632px anyway, so these
+     top out around 2560 and hold from there to 4K.
+
+     Resolved sizes (px):
+                     375    768   1440   1920   2560   3840
+       hero           56     58     77     91    104    104
+       heading        28     33     46     55     68     68
+       intro          15     16     20     22     24     28
+       eyebrow        10     10     11     12     12     14                   */
+  --text-hero: clamp(3.5rem, 2.2rem + 2.9vw, 6.5rem);
+  --text-hero--line-height: 0.85;
+  --text-heading: clamp(1.75rem, 1.15rem + 1.9vw, 4.25rem);
+  --text-heading--line-height: 1.06;
+  --text-intro: clamp(0.9375rem, 0.85rem + 0.42vw, 1.75rem);
+  --text-intro--line-height: 1.6;
+  --text-eyebrow: clamp(0.625rem, 0.6rem + 0.1vw, 0.875rem);
+  --text-eyebrow--line-height: 1.4;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* The page shell. Every band used to be full-bleed with only a 32px gutter, so
+   on a 2K display a left-aligned column sat stranded against a 2560px void.
+   Capping the shell turns that lopsided emptiness into balanced margins, and
+   the gutter opens up with the viewport instead of staying pinned at 32px. */
+.shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 90rem; /* 1440px */
+  padding-inline: 1.25rem;
+}
+@media (min-width: 640px) {
+  .shell {
+    padding-inline: 2rem;
+  }
+}
+@media (min-width: 1280px) {
+  .shell {
+    padding-inline: 3rem;
+  }
+}
+@media (min-width: 1920px) {
+  .shell {
+    max-width: 102rem; /* 1632px, lets true 2K+ breathe without sprawling */
+  }
+}
+
+body {
+  margin: 0;
+  background-color: #f3f5f8;
+  font-family: var(--font-sans);
+  /* clip, not hidden, hidden creates a scroll container that breaks position:sticky */
+  overflow-x: clip;
+}
+
+/* Icons: sharp edges to match the blueprint aesthetic. Lucide ships with rounded
+   line caps/joins; override them globally so every icon reads crisp and technical. */
+.lucide {
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+/* Lucide also rounds the rectangles *inside* some glyphs via rx/ry (the battery
+   body, the network/controller node boxes, cpu). Square those off too — rx/ry are
+   settable as CSS geometry properties — so every icon reads fully sharp. */
+.lucide rect {
+  rx: 0;
+  ry: 0;
+}
+
+/* sunlight sweeping across the coded solar-panel surface in the Solutions intro */
+@keyframes solar-sweep {
+  0% {
+    transform: translateX(-70%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(180%);
+    opacity: 0;
+  }
+}
+
+/* the brand diamond, spun on its vertical axis, reads as a 3D gem */
+@keyframes gem-spin {
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+/* a specular glint sweeping across the metallic wordmark, then a beat of rest */
+@keyframes logo-shine {
+  0% {
+    background-position: 220% 0;
+  }
+  45% {
+    background-position: -120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+/* the proof strip's slow scroll, two copies, loop at -50% for a seamless band */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  animation: marquee 36s linear infinite;
+}
+
+/* slow ambient drift for background glow blobs */
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(-4%, -6%, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(5%, 4%, 0) scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-2%, 6%, 0) scale(0.94);
+    opacity: 0.65;
+  }
+}
+
+.aurora {
+  animation: aurora-drift 26s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+/* ── energy-flow diagram · Technology ──────────────────────────────── */
+/* The sun is the one thing in the chain the product does not carry with it, so
+   it gets the only continuous motion: rays turning slowly, the core breathing.
+   Everything else in the rail moves only in response to the reader. */
+@keyframes sun-rays {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sun-core {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.09);
+    opacity: 1;
+  }
+}
+/* a charge falling down the rail, so the chain reads as having a direction */
+@keyframes rail-drop {
+  0% {
+    top: -12%;
+    opacity: 0;
+  }
+  15%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+.sun-rays {
+  animation: sun-rays 46s linear infinite;
+}
+.sun-core {
+  animation: sun-core 4.2s ease-in-out infinite;
+}
+.rail-drop {
+  animation: rail-drop 3.4s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+/* ── station cutaway · Technology ───────────────────────────────────── */
+/* Charge travelling along whichever leg of the circuit is being described. Only
+   the active leg animates, so the drawing points at one thing at a time. */
+@keyframes cut-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+.cut-flow {
+  stroke-dasharray: 5 13;
+  animation: cut-flow 1.05s linear infinite;
+}
+/* sunlight is a arriving beam, not a circuit: it fades rather than marches */
+@keyframes cut-beam {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.cut-beam {
+  animation: cut-beam 2.6s ease-in-out infinite;
+}
+
+/* ── contact form · sent confirmation ──────────────────────────────── */
+/* The ring draws itself, then the tick strokes through it. Drawing the mark
+   rather than popping it in is what makes the moment feel like a receipt
+   instead of a state change. */
+@keyframes tick-ring {
+  from {
+    stroke-dashoffset: 166;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tick-mark {
+  from {
+    stroke-dashoffset: 48;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tick-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.tick-ring {
+  stroke-dasharray: 166;
+  animation: tick-ring 0.6s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.tick-mark {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: tick-mark 0.35s cubic-bezier(0.65, 0, 0.35, 1) 0.45s forwards;
+}
+.tick-rise {
+  opacity: 0;
+  animation: tick-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
+}
+.tick-rise-late {
+  opacity: 0;
+  animation: tick-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.7s forwards;
+}
+
+/* ── hero scroll cue ───────────────────────────────────────────────── */
+/* A chevron falling through its own window, rather than the stock bounce.
+   It reads as "there is more below" instead of "something needs attention". */
+@keyframes scroll-cue {
+  0% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  30%,
+  60% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+}
+.scroll-cue {
+  animation: scroll-cue 2.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── cursor ─────────────────────────────────────────────────────────────
+   A plain pointed arrow, in the brand navy with a white keyline so it holds
+   up over both the white sections and the dark hero.
+
+   Delivered as a real CSS cursor rather than an element chasing the mouse.
+   The previous version drew a teal diamond plus a ring easing behind it on a
+   rAF loop, with `cursor: none` on everything — which meant the pointer was
+   always a frame or two late, sat in the z-order like any other element, and
+   vanished entirely if the script failed. Handing the shape to the native
+   cursor makes it exact, free, and impossible to lose.
+
+   The `0 0` is the hotspot: the click point is the arrow's tip, as it is in
+   every operating system. Every rule ends in a standard keyword so any browser
+   that rejects the image still gets the right kind of cursor. */
+/* The ordinary pointer everyone already knows how to read — vertical left edge,
+   angled right shoulder, notch, tail — drawn in the brand blue rather than
+   invented anew. Recognition is the whole job of a cursor: the diamond and the
+   dart were both more interesting and both slightly harder to aim with, because
+   the eye has to learn where the point is.
+
+   Blue for the resting state, teal over anything clickable. Same silhouette in
+   both, so the only thing that answers is colour.
+
+   The white keyline is structural rather than decorative: without it the arrow
+   disappears against the dark hero. The `3 2` is the hotspot — the click lands
+   at the tip, as it does in every operating system. */
+:root {
+  --cursor-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'><path d='M3.3 2 L3.3 15.5 L6.9 12.2 L9.2 17.3 L11.6 16.3 L9.4 11.3 L14.2 11.1 Z' fill='%230084d6' stroke='%23ffffff' stroke-width='1.3' stroke-linejoin='round'/></svg>")
+    3 2;
+  --cursor-arrow-brand: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'><path d='M3.3 2 L3.3 15.5 L6.9 12.2 L9.2 17.3 L11.6 16.3 L9.4 11.3 L14.2 11.1 Z' fill='%233bb1e3' stroke='%23ffffff' stroke-width='1.3' stroke-linejoin='round'/></svg>")
+    3 2;
+}
+
+body {
+  cursor: var(--cursor-arrow), default;
+}
+
+/* anything clickable takes the same arrow in brand blue — the shape stays put,
+   only the colour answers, which is quieter than swapping to a grabbing hand */
+a,
+button,
+[role='button'],
+[role='tab'],
+[role='radio'],
+label,
+summary,
+select,
+[data-cursor='hover'] {
+  cursor: var(--cursor-arrow-brand), pointer;
+}
+
+/* text entry keeps the caret it is supposed to have */
+input,
+textarea,
+[contenteditable='true'] {
+  cursor: text;
+}
+
+/* ── GlyphMark icon animations ──────────────────────────────────────────
+   Each mark gets motion true to what it depicts. Everything is transform/
+   opacity only (cheap, smooth) and gated behind reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes gmk-shine {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.14); opacity: 1; }
+  }
+  @keyframes gmk-charge {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+  @keyframes gmk-node {
+    0%, 100% { transform: scale(1); opacity: 0.55; }
+    50% { transform: scale(1.55); opacity: 1; }
+  }
+  @keyframes gmk-shuttle-r {
+    0%, 100% { transform: translateX(-1.5px); }
+    50% { transform: translateX(2.5px); }
+  }
+  @keyframes gmk-shuttle-l {
+    0%, 100% { transform: translateX(1.5px); }
+    50% { transform: translateX(-2.5px); }
+  }
+  @keyframes gmk-flicker {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    42% { opacity: 0.55; }
+    50% { opacity: 1; transform: scale(1.1); }
+    58% { opacity: 0.7; }
+  }
+  @keyframes gmk-float {
+    0%, 100% { transform: translateY(1.5px); }
+    50% { transform: translateY(-1.5px); }
+  }
+  @keyframes gmk-beat {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.5); }
+  }
+  @keyframes gmk-connect {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.14); }
+  }
+  @keyframes gmk-nudge {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+  }
+  @keyframes gmk-ping {
+    0% { transform: scale(0.5); opacity: 0.9; }
+    80%, 100% { transform: scale(1.25); opacity: 0; }
+  }
+
+  .gmk-anim { transform-box: fill-box; transform-origin: center; }
+  .gmk-solar { animation: gmk-shine 3s ease-in-out infinite; }
+  .gmk-bar { animation: gmk-charge 1.8s ease-in-out infinite; }
+  .gmk-node { animation: gmk-node 2.4s ease-in-out infinite; }
+  .gmk-arrow-r { animation: gmk-shuttle-r 2s ease-in-out infinite; }
+  .gmk-arrow-l { animation: gmk-shuttle-l 2s ease-in-out infinite; }
+  .gmk-bolt { animation: gmk-flicker 2.4s ease-in-out infinite; }
+  .gmk-layer { animation: gmk-float 3s ease-in-out infinite; }
+  .gmk-wave { animation: gmk-beat 1.6s ease-in-out infinite; }
+  .gmk-ring { animation: gmk-connect 2.2s ease-in-out infinite; }
+  .gmk-move { animation: gmk-nudge 2.4s ease-in-out infinite; }
+  .gmk-ping { animation: gmk-ping 2.6s ease-out infinite; }
+
+  @keyframes gmk-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.07); }
+  }
+  .house-icon { animation: gmk-breathe 3.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+
+  @keyframes editor-caret {
+    0%, 100% { opacity: 1; }
+  }
+
+  @keyframes arrow-nudge {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+  .arrow-nudge { animation: arrow-nudge 1.4s ease-in-out infinite; }
+}
+
+/* ── content studio · write-in-place editor ──────────────────────────────
+   contentEditable has no native placeholder, so an empty block shows its
+   data-placeholder instead. Kept out of the media query above because the
+   editor must show its prompts regardless of motion preference. */
+[data-editable]:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+[data-editable]:focus {
+  outline: none;
+}
+/* the block being written in gets a quiet rule on its left, the way a page
+   builder shows which block has focus */
+[data-block]:focus-within {
+  box-shadow: -14px 0 0 -12px var(--color-teal-brand);
+}
