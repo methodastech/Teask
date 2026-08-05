@@ -1,0 +1,397 @@
+[
+  {
+    "kind": "news",
+    "slug": "changenow-inspired-challenge-winner",
+    "title": "Teask wins the ChangeNOW x INSPIRED Challenge",
+    "description": "Teask has been named winner of the ChangeNOW x INSPIRED Challenge, taking a €20,000 award to accelerate its clean energy solution, after earlier being named a Pitch Winner at ChangeNOW 2026.",
+    "category": "News",
+    "date": "2026-07-01",
+    "readMinutes": 1,
+    "cover": "/images/events/changenow-inspired.png",
+    "coverAlt": "James Anthony Tan presenting Teask on stage at ChangeNOW, where it won the ChangeNOW x INSPIRED Challenge.",
+    "keywords": [
+      "ChangeNOW",
+      "INSPIRED",
+      "clean energy award",
+      "Teask"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "Teask, Tenaga Alam Sekitar Kita (M) Sdn Bhd, has been named the winner of the ChangeNOW x INSPIRED Challenge, receiving €20,000 to accelerate its clean energy solution.",
+          "The award recognises work on making renewable energy more accessible for electric mobility, lowering both the cost and the resource footprint of getting charging infrastructure to where it is needed. Teask had already been named a Pitch Winner at ChangeNOW 2026 earlier in the programme.",
+          "The challenge runs as part of ChangeNOW’s partnership with INSPIRED, a platform connecting innovators, investors and changemakers to help impact solutions grow faster."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "solar-ev-charging-station-malaysia",
+    "title": "Solar EV Charging Stations in Malaysia: The Complete Guide",
+    "description": "What a solar EV charging station is, how it works, what it costs to host, and why portable stations are reshaping EV infrastructure in Malaysia.",
+    "category": "EV charging",
+    "date": "2026-07-21",
+    "readMinutes": 6,
+    "cover": "/images/photos/l1960350.jpg",
+    "coverAlt": "The Teask T Station, a portable solar EV charging station, installed at a shopping centre in Cyberjaya, Malaysia.",
+    "keywords": [
+      "solar EV charging station Malaysia",
+      "EV charging Malaysia",
+      "solar charging station"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "Malaysia’s EV adoption is accelerating faster than its charging infrastructure. Every new electric car, e-motorcycle and e-bike needs somewhere to charge, and most sites that want to offer charging are stopped by the same three walls: grid capacity, civil works, and time.",
+          "A solar EV charging station removes all three. Instead of pulling power from an already-stretched connection, it generates its own electricity from a photovoltaic canopy, stores it in on-board batteries, and delivers it to vehicles on demand, with or without a grid connection."
+        ]
+      },
+      {
+        "heading": "How a solar charging station works",
+        "paragraphs": [
+          "The architecture is simple to describe: solar panels on top, battery storage in the body, charging outlets at the base, and an energy-management system deciding where every watt goes. Sunlight becomes stored energy during the day; vehicles draw on that store whenever they plug in, including at night.",
+          "The engineering challenge is packaging all of that into something that can be delivered, installed and serving vehicles quickly. That is the problem the Teask T Station was designed around: the whole station arrives pre-assembled and goes live in under thirty minutes, with no trenching and no substation upgrade."
+        ]
+      },
+      {
+        "heading": "Why portable beats fixed for most Malaysian sites",
+        "paragraphs": [
+          "Malls, campuses, hospitals and councils rarely know exactly where EV demand will land first. A fixed installation is a bet poured in concrete. A portable station is a bet you can move: if one bay under-performs, the station relocates to where demand actually is.",
+          "Portability also changes the approval conversation. Because a station like the T Station sits on any flat ground without civil works, hosting one is closer to placing equipment than commissioning construction, which is why Malaysia’s first portable solar EV charging station could go live at a working shopping centre in Cyberjaya."
+        ]
+      },
+      {
+        "heading": "What to look for when evaluating a station",
+        "paragraphs": [
+          "Four questions separate serious infrastructure from a gadget: How fast does it deploy? What happens when the grid goes down? How long is the design life? And can it grow, more capacity, more outlets, more intelligence, without being replaced?",
+          "Teask’s answers: under 30 minutes; the station keeps serving because it generates and stores its own energy; a 25+ year structural service life with upgradeable modules; and a modular platform designed to scale from a single charging bay to a networked microgrid. If you are evaluating charging for your site, start a conversation, one is enough to scope a deployment."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "portable-ev-charger-vs-fixed",
+    "title": "Portable vs Fixed EV Charging: Which Is Right for Your Site?",
+    "description": "A practical comparison of portable EV chargers and fixed charging installations, cost, speed of deployment, flexibility and risk, for malls, campuses and fleets.",
+    "category": "EV charging",
+    "date": "2026-07-18",
+    "readMinutes": 5,
+    "cover": "/images/photos/l1960343.jpg",
+    "coverAlt": "Electric motorcycles parked and charging under the solar canopy of a portable Teask T Station.",
+    "keywords": [
+      "portable EV charger",
+      "EV charging installation",
+      "portable charging station"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "Every site that considers EV charging faces the same first decision, not which brand, but which philosophy: build charging into the ground, or place charging onto it.",
+          "Fixed charging is trenched, wired and permanently connected. Portable charging, like the Teask T Station, arrives complete, sets down on flat ground, and can relocate when the site’s needs change. The right answer depends on how certain you are about demand."
+        ]
+      },
+      {
+        "heading": "Where fixed installations win",
+        "paragraphs": [
+          "If a site has guaranteed, concentrated, long-horizon demand, a dedicated fleet depot with vehicles assigned to bays for a decade, fixed DC infrastructure with a dedicated grid connection earns its construction cost. The civil works amortise over years of predictable use."
+        ]
+      },
+      {
+        "heading": "Where portable stations win",
+        "paragraphs": [
+          "Everywhere demand is uncertain, distributed or moving, which, in Malaysia’s current EV market, is most places. A portable solar station needs no trenching, no substation queue and no permits marathon. It goes live in under thirty minutes, starts collecting real usage data on day one, and redeploys if the first location was wrong.",
+          "There is also a resilience dividend: because a station like the T Station generates and stores its own energy, a grid outage doesn’t take your charging offline. For hospitals, campuses and event venues, that reliability is often the deciding factor."
+        ]
+      },
+      {
+        "heading": "The honest decision framework",
+        "paragraphs": [
+          "Ask three questions. One: can you say with confidence where EV demand at your site will be in five years? Two: can you afford months of construction and approvals before the first vehicle charges? Three: does your site need charging to survive grid interruptions?",
+          "If any answer is no, uncertain or yes-respectively, portable infrastructure is the lower-risk path, and the one you can change your mind about. Tell us about your site and we’ll map the fit."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "how-solar-microgrids-work",
+    "title": "How Solar Microgrids Work: From Panel to Socket",
+    "description": "Solar microgrids explained simply: generation, storage, intelligent distribution, and how modular microgrids bring reliable power where the grid is weak or absent.",
+    "category": "Microgrids",
+    "date": "2026-07-15",
+    "readMinutes": 6,
+    "cover": "https://d8j0ntlcm91z4.cloudfront.net/user_3FP46Emobin1BeouoYpzom4YJCr/hf_20260719_210647_8d9d5228-daba-4a2b-a3e4-2014a08b3d4d_min.webp",
+    "coverAlt": "Several Teask T Station units clustered together forming a modular solar microgrid.",
+    "keywords": [
+      "solar microgrid Malaysia",
+      "how microgrids work",
+      "modular microgrid"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "A microgrid is exactly what it sounds like: a small, self-contained electricity network that can generate, store and distribute its own power, connected to the national grid when that helps, independent of it when it must be.",
+          "For most of the last century, electricity meant one direction: big plant, long wires, passive consumers. Microgrids invert that. Generation happens where consumption happens, and the wires shrink from hundreds of kilometres to metres."
+        ]
+      },
+      {
+        "heading": "The three layers of every microgrid",
+        "paragraphs": [
+          "Generation: photovoltaic panels convert sunlight to DC electricity. In a modular system like Teask’s, each station carries its own canopy, so capacity grows by adding units rather than re-engineering the whole array.",
+          "Storage: batteries decouple when energy is made from when it is used. Sunlight at noon becomes charging at midnight. Storage is also what lets a microgrid ride through cloudy hours and grid outages without dropping its loads.",
+          "Intelligence: an energy-management layer decides, moment to moment, whether each watt should charge a vehicle, fill a battery, or, in grid-tied configurations, flow to the wider network. This layer is what turns hardware into infrastructure."
+        ]
+      },
+      {
+        "heading": "Why modularity changes the economics",
+        "paragraphs": [
+          "Traditional microgrids are civil-engineering projects: designed once, built once, sized for a demand forecast that is usually wrong in one direction or the other. Modular microgrids sidestep the forecasting problem, deploy one station in under thirty minutes, measure real demand, then add units as the load grows.",
+          "That is the system Teask is building toward: T Stations that operate alone today and interconnect into larger intelligent networks as deployments multiply, with VPPA-ready energy services and, on the roadmap, peer-to-peer energy trading between stations. The microgrid, in other words, is not a product you buy once. It is a network that grows."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "e-motorcycle-charging-infrastructure",
+    "title": "E-Motorcycle Charging: What Fleets and Campuses Need to Know",
+    "description": "E-motorcycles are electrifying deliveries and campus mobility across Southeast Asia. Here is how charging infrastructure needs to differ from car-centric thinking.",
+    "category": "EV charging",
+    "date": "2026-07-12",
+    "readMinutes": 5,
+    "cover": "/images/photos/l1960338.jpg",
+    "coverAlt": "A row of yellow electric motorcycles charging beneath a Teask T Station solar canopy.",
+    "keywords": [
+      "e-motorcycle charging",
+      "electric motorcycle Malaysia",
+      "fleet charging"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "The quiet electrification story in Southeast Asia is not cars, it is two wheels. Delivery fleets, campus mobility and short-hop urban riding are switching to e-motorcycles and e-bikes faster than any other segment, because the economics already work.",
+          "But charging infrastructure built for cars serves them badly. Two-wheeler fleets need many light charging points, high turnover, and chargers positioned where riders actually stop, not two premium DC bays at the far corner of a car park."
+        ]
+      },
+      {
+        "heading": "The fleet math: turnaround is everything",
+        "paragraphs": [
+          "A delivery e-motorcycle earns nothing while it charges. Every minute of downtime multiplies across the fleet and the day. That is why charging speed matters disproportionately for two-wheelers, and why Teask engineered its proprietary fast-charging system, reaching 80% charge in three minutes at 7.4 kW on supported e-motorcycle platforms.",
+          "At that speed, charging stops behaving like parking and starts behaving like refuelling: a rider pulls in, swaps or tops up, and is back on the route before the queue notices."
+        ]
+      },
+      {
+        "heading": "Where the chargers should actually go",
+        "paragraphs": [
+          "The best charging point is the one already on the rider’s path: the mall where lunch orders cluster, the campus gate, the hub where shifts change. Because the T Station deploys on any flat ground in under thirty minutes, infrastructure can follow the routes, and move when the routes move.",
+          "Malaysia’s first portable solar EV and e-motorcycle charging station has been serving exactly this need at DPULZE Shopping Centre in Cyberjaya. If you run a fleet or manage a campus, the pilot playbook already exists, talk to us about your routes."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "30-minute-deployment",
+    "title": "Deployed in Under 30 Minutes: How the T Station Installs Without Civil Works",
+    "description": "No trenching, no substation, no permits queue: inside the design decisions that let a complete solar charging station go live in under half an hour.",
+    "category": "Product",
+    "date": "2026-07-08",
+    "readMinutes": 5,
+    "cover": "/images/photos/l1960309.jpg",
+    "coverAlt": "The matte black cabinet of the Teask T Station with its white chevron and blue diamond emblem.",
+    "keywords": [
+      "portable power infrastructure",
+      "rapid deployment energy",
+      "T Station"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "Most energy infrastructure is slow because it is built on site. Foundations are poured, trenches are cut, cables are pulled, inspections are scheduled, and a year disappears before the first electron flows.",
+          "The T Station inverts the model: everything is built, integrated and tested before it arrives. Deployment is not construction. It is placement."
+        ]
+      },
+      {
+        "heading": "Arrive, set down, power on",
+        "paragraphs": [
+          "The station ships whole on a flatbed, solar canopy folded, batteries charged, systems tested. On site, it sets down onto any reasonably flat surface on its levelling base. No trenching, because there is no cable run to bury. No substation application, because the energy source is on the roof.",
+          "The butterfly canopy then unfolds on its hinged wings, tension cables pre-load the structure, and the station begins generating. From truck to serving vehicles: under thirty minutes."
+        ]
+      },
+      {
+        "heading": "Why the speed is a design outcome, not a stunt",
+        "paragraphs": [
+          "Every subsystem had to earn its place in that half hour. Modular cabinets that crane as one piece. A fold-flat canopy inspired by the practical, modular architecture of traditional Malaysian kampung houses, built to suit the environment and to endure. Interfaces that connect without field wiring.",
+          "The same choices that make the station fast also make it movable and maintainable: what deploys in thirty minutes can relocate in the same time, and a 25+ year service life becomes realistic when modules can be swapped instead of demolished. Speed, it turns out, is what infrastructure looks like when nothing about it is improvised."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "off-grid-power-rural-malaysia",
+    "title": "Powering Off-Grid Malaysia: Rural Electrification Options Compared",
+    "description": "Grid extension, diesel generators, fixed solar or portable solar stations, an honest comparison for rural sites, plantations, island resorts and remote communities.",
+    "category": "Rural power",
+    "date": "2026-07-04",
+    "readMinutes": 6,
+    "cover": "https://d8j0ntlcm91z4.cloudfront.net/user_3FP46Emobin1BeouoYpzom4YJCr/hf_20260719_181418_db4366e8-1422-489b-b227-1b7d35ebbdec_min.webp",
+    "coverAlt": "A Teask T Station deployed on open rural ground at dusk, charging an electric motorcycle.",
+    "keywords": [
+      "rural electrification Malaysia",
+      "off-grid power",
+      "renewable energy solutions"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "For a village, plantation or resort beyond the grid’s edge, the question is never whether power matters. It is which compromise to accept: wait years for wires, burn diesel forever, or build solar that cannot move.",
+          "Each option has a real cost profile, and pretending otherwise helps nobody. Here is the honest comparison."
+        ]
+      },
+      {
+        "heading": "The four options, plainly",
+        "paragraphs": [
+          "Grid extension delivers the most capacity, eventually. Per-kilometre costs are high, timelines run to years, and remote loads may never justify the wire. It is the right answer close to existing lines, and a mirage far from them.",
+          "Diesel generation deploys fast and is well understood, then charges rent forever: fuel logistics, maintenance, noise and emissions. As a bridge it works; as a destination it is expensive.",
+          "Fixed solar-plus-storage has excellent operating economics but inherits construction: panels mounted, batteries housed, everything engineered per site. And it is a bet nailed to one location.",
+          "Portable solar stations package generation, storage and distribution into a unit that arrives working. Deployment in under thirty minutes, no civil works, standalone by design, and if the community’s needs shift, the station relocates rather than strands."
+        ]
+      },
+      {
+        "heading": "Resilience is the quiet differentiator",
+        "paragraphs": [
+          "Remote sites feel every infrastructure failure hardest: a downed line or a late fuel barge can mean days without power. Self-contained solar-plus-storage keeps essential loads, lighting, refrigeration, communications, mobility charging, running on sunlight that never misses a delivery.",
+          "This is the deployment reality the T Station was engineered for: energy delivered wherever conventional infrastructure is slow, absent or too expensive. If you are responsible for a site the grid forgot, we should talk."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "disaster-response-power",
+    "title": "Energy After the Storm: Why Deployment Speed Defines Disaster Response",
+    "description": "When floods or storms take the grid down, the first 72 hours decide everything. The case for rapidly deployable solar power in disaster and emergency response.",
+    "category": "Resilience",
+    "date": "2026-06-25",
+    "readMinutes": 5,
+    "cover": "/images/photos/l1960327.jpg",
+    "coverAlt": "A Teask T Station installed outdoors among trees, self-contained and operating.",
+    "keywords": [
+      "disaster response power",
+      "emergency power supply",
+      "resilient energy infrastructure"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "Disasters do not schedule around infrastructure timelines. When flooding takes a substation offline, the communities affected need power measured in hours, for communications, medical refrigeration, water pumping, and the coordination that everything else depends on.",
+          "The traditional answer is diesel generators trucked in with fuel convoys behind them. It works, at the price of logistics that are themselves fragile in a disaster zone."
+        ]
+      },
+      {
+        "heading": "The 72-hour window",
+        "paragraphs": [
+          "Emergency-response practice treats the first 72 hours as decisive. Energy in that window is not a comfort, it is the substrate for every other response: charging radios and phones, keeping clinics cold-chain compliant, lighting shelters, powering pumps.",
+          "A power source that arrives complete and self-fuelling changes the calculus. A solar station with on-board storage deploys in under thirty minutes on any flat ground, serves loads immediately from its charged batteries, and replenishes itself every daylight hour, no fuel convoy required."
+        ]
+      },
+      {
+        "heading": "Resilience you can rehearse",
+        "paragraphs": [
+          "The deeper advantage of portable energy in emergency planning is that it is rehearsable: a station that serves a campus or mall in normal times can be redeployed to a disaster zone when needed, by the same flatbed that delivered it. Infrastructure that earns its keep every day, and answers the call on the worst one.",
+          "For agencies and councils building resilience plans, the question worth asking is simple: when the grid fails, how many minutes until your first watt? If the honest answer is measured in days, let’s change it."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "distributed-energy-infrastructure",
+    "title": "What Is Distributed Energy Infrastructure (and Why It Beats the Long Wire)",
+    "description": "Distributed energy infrastructure explained: generation where consumption happens, modular capacity, and networks that grow unit by unit instead of project by project.",
+    "category": "Infrastructure",
+    "date": "2026-06-20",
+    "readMinutes": 6,
+    "cover": "/images/photos/nea-202.jpg",
+    "coverAlt": "The Teask team beneath a Race Towards Net Zero arch at a national energy exhibition in Malaysia.",
+    "keywords": [
+      "distributed energy infrastructure",
+      "decentralised energy",
+      "portable power infrastructure"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "The 20th-century grid was built on one idea: generate electricity in enormous plants, then move it enormous distances. That architecture electrified nations, and hard-wired in its costs: transmission losses, years-long build times, and a system where one failure cascades across regions.",
+          "Distributed energy infrastructure is the counter-idea: many smaller sources, placed where the demand is, networked into something more resilient than any single plant."
+        ]
+      },
+      {
+        "heading": "The three properties that matter",
+        "paragraphs": [
+          "Proximity: when generation sits metres from consumption, transmission losses approach zero and the years spent building long wires disappear from the schedule.",
+          "Modularity: capacity added in units, not megaprojects. Demand doubled? Deploy more stations. Demand moved? So does the hardware. The forecast-risk that haunts big infrastructure simply shrinks.",
+          "Independence-with-connection: each node can stand alone when the network fails, and cooperate when it works. That is the property that turns a collection of stations into infrastructure, and it is software, as much as hardware."
+        ]
+      },
+      {
+        "heading": "From stations to a thinking network",
+        "paragraphs": [
+          "Teask’s framing for this is working backwards from real deployments: every T Station is a complete energy system today, generation, storage, intelligent management, and a node in a wider network as deployments multiply. The roadmap runs through VPPA-enabled energy services toward stations that trade energy with each other, locally.",
+          "Malaysia has a rare opportunity here: to skip a generation of wire-first thinking and build energy the way it now builds computing, distributed, modular, and close to the user. That is the infrastructure Teask exists to build."
+        ]
+      }
+    ],
+    "status": "published"
+  },
+  {
+    "kind": "article",
+    "slug": "solar-canopy-design-butterfly",
+    "title": "Why the T Station’s Solar Canopy Looks the Way It Does",
+    "description": "Butterfly wings, tension cables and kampung-house pragmatism: the engineering story behind the T Station’s fold-flat solar canopy.",
+    "category": "Product",
+    "date": "2026-06-10",
+    "readMinutes": 4,
+    "cover": "/images/photos/l1960325.jpg",
+    "coverAlt": "Close view of the Teask T Station’s solar canopy, cabinet and emblem, with e-motorcycles beneath.",
+    "keywords": [
+      "solar canopy design",
+      "solar charging station design",
+      "T Station engineering"
+    ],
+    "sections": [
+      {
+        "paragraphs": [
+          "Most solar canopies are roofs with panels on them. The T Station’s canopy is something else: a fold-flat, dual-pitch “butterfly” that ships closed, opens on site, and pre-tensions itself with steel stay cables, more sailing rig than shed.",
+          "Every one of those choices traces back to a single constraint: the whole station must travel as one piece and deploy in under thirty minutes."
+        ]
+      },
+      {
+        "heading": "Fold-flat or it does not ship",
+        "paragraphs": [
+          "A canopy wide enough to shade charging bays is too wide for a flatbed. So the wings hinge: folded for transport, opened on site, with the hinge mechanism engineered as four assemblies of male, female and pin components that field crews never need to adjust.",
+          "The tension cables are what make the open wings structural. Rather than carrying the cantilever with heavy beams, the design pre-loads thin steel stays, the same principle that lets a yacht mast carry enormous sail loads with slender hardware. Less steel, less weight, faster crane lifts."
+        ]
+      },
+      {
+        "heading": "The kampung-house inheritance",
+        "paragraphs": [
+          "The design philosophy is older than the technology. The T Station’s modular, movable architecture draws on the traditional Malaysian kampung house, built to suit its environment, adaptable over generations, and designed to endure with maintenance rather than demolition.",
+          "That inheritance is why the station reads as considered rather than improvised: a 25+ year structural service life, modules that upgrade in place, and a form that earns every kilogram. Practical engineering, drawn from a practical tradition."
+        ]
+      }
+    ],
+    "status": "published"
+  }
+]

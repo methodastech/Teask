@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarDays } from 'lucide-react'
-import { getRelated, POSTS } from '../../lib/posts'
+import { usePosts, useRelated } from '../../lib/postsStore'
 import { chamferClip } from '../ChamferBorder'
 
 /**
@@ -47,9 +47,10 @@ function RailHeading({ children }: { children: string }) {
 }
 
 export default function BlogSidebar({ slug }: { slug: string }) {
-  const related = getRelated(slug, 3)
+  const { posts } = usePosts()
+  const related = useRelated(slug, 3)
   const relatedSlugs = new Set(related.map((p) => p.slug))
-  const more = POSTS.filter((p) => p.slug !== slug && !relatedSlugs.has(p.slug)).slice(0, 3)
+  const more = posts.filter((p) => p.slug !== slug && !relatedSlugs.has(p.slug)).slice(0, 3)
 
   return (
     <aside className="space-y-10 lg:sticky lg:top-24 lg:self-start" aria-label="Related content">

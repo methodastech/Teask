@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Lock, X } from 'lucide-react'
-import { DEMO_EMAIL, DEMO_PASSWORD, useAuth } from '../lib/auth'
+import { useAuth } from '../lib/auth'
 import Logo from './Logo'
 
 const FIELD =
@@ -14,6 +14,7 @@ export default function LoginModal() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
 
   // reset the form each time the modal opens; close on Escape
   useEffect(() => {
@@ -21,25 +22,24 @@ export default function LoginModal() {
     setEmail('')
     setPassword('')
     setError('')
+    setPending(false)
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeLogin()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [loginOpen, closeLogin])
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (login(email, password)) {
+    setPending(true)
+    // the API decides now, so this is a round trip rather than a comparison
+    const message = await login(email, password)
+    setPending(false)
+    if (message === null) {
       closeLogin()
       navigate('/admin')
     } else {
-      setError('Those credentials do not match the demo account.')
+      setError(message)
     }
-  }
-
-  const useDemo = () => {
-    setEmail(DEMO_EMAIL)
-    setPassword(DEMO_PASSWORD)
-    setError('')
   }
 
   return (
@@ -103,35 +103,12 @@ export default function LoginModal() {
               {error && <p className="text-xs font-medium text-red-500">{error}</p>}
               <button
                 type="submit"
-                className="w-full cursor-pointer bg-blue-brand px-6 py-3.5 text-sm font-semibold tracking-[0.15em] text-white uppercase transition-colors duration-300 hover:bg-teal-brand"
+                disabled={pending}
+                className="w-full cursor-pointer bg-blue-brand px-6 py-3.5 text-sm font-semibold tracking-[0.15em] text-white uppercase transition-colors duration-300 hover:bg-teal-brand disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Sign in
+                {pending ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
-
-            {/* demo credentials, this is a prototype with a shared demo account */}
-            <div className="mt-6 border border-dashed border-teal-brand/40 bg-teal-brand/5 p-4">
-              <div className="font-mono text-[10px] tracking-[0.2em] text-teal-brand uppercase">
-                Demo account
-              </div>
-              <dl className="mt-2 space-y-1 font-mono text-xs text-navy-950">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-gray-500">email</dt>
-                  <dd className="font-semibold">{DEMO_EMAIL}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-gray-500">password</dt>
-                  <dd className="font-semibold">{DEMO_PASSWORD}</dd>
-                </div>
-              </dl>
-              <button
-                type="button"
-                onClick={useDemo}
-                className="mt-3 cursor-pointer text-xs font-semibold tracking-wide text-teal-brand uppercase hover:text-blue-brand"
-              >
-                Fill demo credentials →
-              </button>
-            </div>
           </motion.div>
         </motion.div>
       )}

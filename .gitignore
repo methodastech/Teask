@@ -6,6 +6,12 @@ dist/
 .env.*
 !.env.example
 
+# holds the database password
+api/config.php
+# uploaded covers belong on the server, not in the repo
+api/uploads/*
+!api/uploads/.htaccess
+
 .claude/settings.local.json
 
 npm-debug.log*

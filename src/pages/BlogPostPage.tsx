@@ -1,14 +1,15 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Calendar, Clock } from 'lucide-react'
-import { getPost } from '../lib/posts'
+import type { Post } from '../lib/posts'
+import { usePost } from '../lib/postsStore'
+import { RichText } from '../lib/richText'
 import { usePageMeta, SITE_URL } from '../lib/seo'
 import { chamferClip } from '../components/ChamferBorder'
 import BlogSidebar from '../components/site/BlogSidebar'
 
 /** /resources/:slug, one article, marked up as an Article for search and AI. */
 
-function PostBody({ slug }: { slug: string }) {
-  const post = getPost(slug)!
+function PostBody({ post }: { post: Post }) {
   const date = new Date(post.date)
 
   usePageMeta({
@@ -81,17 +82,38 @@ function PostBody({ slug }: { slug: string }) {
               />
 
               {post.sections.map((s, i) => (
-                <section key={i} className={i > 0 ? 'mt-10' : 'mt-10'}>
-                  {s.heading && (
-                    <h2 className="font-display text-2xl font-medium tracking-normal text-navy-950 md:text-3xl">
-                      {s.heading}
-                    </h2>
-                  )}
+                <section key={i} className="mt-10">
+                  {s.heading &&
+                    (s.headingLevel === 3 ? (
+                      <h3 className="font-display text-lg font-medium tracking-normal text-navy-950 md:text-xl">
+                        {s.heading}
+                      </h3>
+                    ) : (
+                      <h2 className="font-display text-2xl font-medium tracking-normal text-navy-950 md:text-3xl">
+                        {s.heading}
+                      </h2>
+                    ))}
                   {s.paragraphs.map((p, j) => (
                     <p key={j} className="mt-5 text-base leading-relaxed text-gray-600">
-                      {p}
+                      <RichText text={p} />
                     </p>
                   ))}
+                  {/* a picture placed mid-article, as opposed to the cover */}
+                  {s.image?.src && (
+                    <figure className="mt-8">
+                      <img
+                        src={s.image.src}
+                        alt={s.image.alt}
+                        loading="lazy"
+                        className="w-full object-cover shadow-[0_1px_2px_rgba(16,24,40,0.05),0_16px_40px_rgba(16,24,40,0.10)]"
+                      />
+                      {s.image.alt && (
+                        <figcaption className="mt-3 text-center text-xs text-gray-500">
+                          {s.image.alt}
+                        </figcaption>
+                      )}
+                    </figure>
+                  )}
                 </section>
               ))}
 
@@ -126,6 +148,24 @@ function PostBody({ slug }: { slug: string }) {
 
 export default function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>()
-  if (!slug || !getPost(slug)) return <Navigate to="/resources" replace />
-  return <PostBody slug={slug} />
+  const { post, loading } = usePost(slug)
+
+  // The library arrives over the network, so "not in the list" and "the list
+  // has not landed yet" are different states. Redirecting during the second
+  // would bounce every reader who opens an article link directly.
+  if (loading) {
+    return (
+      <main className="pt-16 md:pt-20">
+        <div className="mx-auto max-w-6xl animate-pulse px-5 py-16 sm:px-8 md:py-24">
+          <div className="h-2 w-28 bg-navy-950/[0.08]" />
+          <div className="mt-8 h-10 w-3/4 bg-navy-950/[0.08]" />
+          <div className="mt-4 h-4 w-1/2 bg-navy-950/[0.06]" />
+          <div className="mt-8 aspect-[16/8] w-full max-w-3xl bg-navy-950/[0.06]" />
+        </div>
+      </main>
+    )
+  }
+
+  if (!post) return <Navigate to="/resources" replace />
+  return <PostBody post={post} />
 }

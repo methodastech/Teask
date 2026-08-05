@@ -1,5 +1,3 @@
-import { loadCmsPosts } from './cms'
-
 /**
  * The Teask insights library, 9 SEO-driven articles across the niche
  * (solar EV charging, microgrids, rural power, distributed energy, AI energy).
@@ -18,6 +16,30 @@ import { loadCmsPosts } from './cms'
  */
 export type PostKind = 'article' | 'news'
 
+/** an image placed inside the body, as opposed to the article's cover */
+export interface PostImage {
+  src: string
+  alt: string
+}
+
+/**
+ * A run of the article: an optional heading, its paragraphs, and an optional
+ * image closing it off.
+ *
+ * The editor works in a flat list of blocks, which is how writing feels, and
+ * folds that into sections on save — a new section starts at every heading, and
+ * an image ends the one it sits in. Keeping the stored shape sectioned rather
+ * than flat means the nine articles written before any of this existed still
+ * load and render unchanged.
+ */
+export interface PostSection {
+  heading?: string
+  /** 2 is a heading, 3 a subheading; absent means 2 */
+  headingLevel?: 2 | 3
+  paragraphs: string[]
+  image?: PostImage
+}
+
 export interface Post {
   /** absent means 'article'; the nine seeded posts predate the split */
   kind?: PostKind
@@ -30,7 +52,7 @@ export interface Post {
   cover: string
   coverAlt: string
   keywords: string[]
-  sections: Array<{ heading?: string; paragraphs: string[] }>
+  sections: PostSection[]
 }
 
 const CDN = 'https://d8j0ntlcm91z4.cloudfront.net/user_3FP46Emobin1BeouoYpzom4YJCr/'
@@ -388,31 +410,32 @@ export const POSTS: Post[] = [
   },
 ]
 
-/** everything, demo-CMS items first (newest published on top), then built-ins */
-export function getAllPosts(): Post[] {
-  return [...loadCmsPosts(), ...POSTS]
-}
+/**
+ * The selectors below take the library as an argument rather than reading it
+ * themselves. Posts now come from the database over the network, which makes
+ * loading them asynchronous — so the components get the list from
+ * PostsProvider (lib/postsStore.tsx) and pass it in here, and these stay pure
+ * and synchronous.
+ */
 
 export const kindOf = (p: Post): PostKind => p.kind ?? 'article'
 
 /** the insights library: long-form, evergreen */
-export const getArticles = (): Post[] => getAllPosts().filter((p) => kindOf(p) === 'article')
+export const articlesIn = (posts: Post[]): Post[] => posts.filter((p) => kindOf(p) === 'article')
 
 /** newsroom entries, newest first — these are dated items, so order by date */
-export const getNews = (): Post[] =>
-  getAllPosts()
-    .filter((p) => kindOf(p) === 'news')
-    .sort((a, b) => b.date.localeCompare(a.date))
+export const newsIn = (posts: Post[]): Post[] =>
+  posts.filter((p) => kindOf(p) === 'news').sort((a, b) => b.date.localeCompare(a.date))
 
-export const getPost = (slug: string): Post | undefined =>
-  loadCmsPosts().find((p) => p.slug === slug) ?? POSTS.find((p) => p.slug === slug)
+export const findPost = (posts: Post[], slug: string): Post | undefined =>
+  posts.find((p) => p.slug === slug)
 
 /** posts related to one article: same category first, then keyword overlap, newest first */
-export function getRelated(slug: string, n: number): Post[] {
-  const current = getPost(slug)
-  if (!current) return POSTS.slice(0, n)
+export function relatedIn(posts: Post[], slug: string, n: number): Post[] {
+  const current = findPost(posts, slug)
+  if (!current) return posts.slice(0, n)
   // stay within the same kind: a news item should not surface under an article
-  const others = getAllPosts().filter((p) => p.slug !== slug && kindOf(p) === kindOf(current))
+  const others = posts.filter((p) => p.slug !== slug && kindOf(p) === kindOf(current))
   const score = (p: Post) =>
     (p.category === current.category ? 10 : 0) +
     p.keywords.filter((k) => current.keywords.includes(k)).length

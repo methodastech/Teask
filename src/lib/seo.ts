@@ -40,6 +40,15 @@ export function usePageMeta(opts: {
   /** page-scoped JSON-LD (replaced on navigation) */
   jsonLd?: object | object[]
 }) {
+  /**
+   * Compared as a string, not by identity: the caller rebuilds this object on
+   * every render, and its contents now arrive asynchronously — the Resources
+   * page lists articles fetched from the API. Depending on identity would run
+   * the effect constantly; leaving it out of the deps, as this once did, would
+   * publish the empty list captured on mount and never correct it.
+   */
+  const jsonLd = opts.jsonLd ? JSON.stringify(opts.jsonLd) : ''
+
   useEffect(() => {
     const url = `${SITE_URL}${opts.path === '/' ? '' : opts.path}`
     document.title = opts.title
@@ -57,16 +66,16 @@ export function usePageMeta(opts: {
     setMeta('name', 'twitter:image', opts.ogImage ?? DEFAULT_OG_IMAGE)
 
     let script = document.getElementById('page-jsonld') as HTMLScriptElement | null
-    if (opts.jsonLd) {
+    if (jsonLd) {
       if (!script) {
         script = document.createElement('script')
         script.type = 'application/ld+json'
         script.id = 'page-jsonld'
         document.head.appendChild(script)
       }
-      script.textContent = JSON.stringify(opts.jsonLd)
+      script.textContent = jsonLd
     } else if (script) {
       script.remove()
     }
-  }, [opts.title, opts.description, opts.path, opts.ogImage, opts.ogType]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [opts.title, opts.description, opts.path, opts.ogImage, opts.ogType, jsonLd]) // eslint-disable-line react-hooks/exhaustive-deps
 }

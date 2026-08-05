@@ -9,14 +9,22 @@ import {
   Newspaper,
   LogOut,
   PenSquare,
+  Pencil,
   Search,
   Trash2,
 } from 'lucide-react'
 import Logo from '../components/Logo'
-import PostEditor, { emptyDoc, type EditorDoc } from '../components/admin/PostEditor'
+import PostEditor, {
+  docFromPost,
+  emptyDoc,
+  sectionsFromBlocks,
+  type EditorDoc,
+} from '../components/admin/PostEditor'
 import { useAuth } from '../lib/auth'
-import { deleteCmsPost, estimateReadMinutes, loadCmsPosts, saveCmsPost, slugify } from '../lib/cms'
-import type { Post } from '../lib/posts'
+import { estimateReadMinutes, removePost, savePost, slugify, uploadCover, usingDatabase } from '../lib/cms'
+import { kindOf, type Post, type PostKind } from '../lib/posts'
+import { usePosts } from '../lib/postsStore'
+import { plainText } from '../lib/richText'
 import { usePageMeta } from '../lib/seo'
 
 /**
@@ -30,9 +38,20 @@ import { usePageMeta } from '../lib/seo'
  */
 
 const DEFAULT_COVER = '/images/photos/l1960350.jpg'
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 // 2 MB, keeps us inside the browser storage budget
+// only applies without a server, where the cover has to fit in localStorage
+const MAX_LOCAL_UPLOAD_BYTES = 2 * 1024 * 1024
 
-type View = 'overview' | 'posts' | 'news' | 'new'
+/**
+ * The rail has three destinations, and writing is not one of them.
+ *
+ * Articles and News are separate shelves, and the editor belongs to whichever
+ * shelf the piece is on — so opening it keeps you inside that section rather
+ * than moving you to a fourth place where both kinds are mixed together.
+ */
+type Section = 'overview' | 'articles' | 'news'
+
+const messageFrom = (e: unknown, fallback: string) =>
+  e instanceof Error && e.message ? e.message : fallback
 
 export default function AdminPage() {
   const { user, logout } = useAuth()
@@ -42,16 +61,32 @@ export default function AdminPage() {
     path: '/admin',
   })
 
-  const [posts, setPosts] = useState<Post[]>(() => loadCmsPosts())
+  // the studio reads the same library the public site does, so what is listed
+  // here is exactly what a visitor would find on /resources
+  const { posts, loading, error, reload } = usePosts()
   // the studio lists the two kinds separately, so split once here
-  const articles = useMemo(() => posts.filter((p) => (p.kind ?? 'article') === 'article'), [posts])
-  const news = useMemo(() => posts.filter((p) => p.kind === 'news'), [posts])
-  const [view, setView] = useState<View>('overview')
+  const articles = useMemo(() => posts.filter((p) => kindOf(p) === 'article'), [posts])
+  const news = useMemo(() => posts.filter((p) => kindOf(p) === 'news'), [posts])
+  const [section, setSection] = useState<Section>('overview')
+  const [editing, setEditing] = useState(false)
   const [railOpen, setRailOpen] = useState(true)
   const [query, setQuery] = useState('')
 
   const [doc, setDoc] = useState<EditorDoc>(emptyDoc)
   const [flash, setFlash] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  /**
+   * While the editor is open the rail follows what is being written, not what
+   * was last browsed. That keeps the highlight honest if the Article/News
+   * toggle is used inside the editor — the piece moves shelf, and so does the
+   * place the rail says you are.
+   */
+  const activeSection: Section = editing
+    ? doc.kind === 'news'
+      ? 'news'
+      : 'articles'
+    : section
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const dateLabel = useMemo(
@@ -64,9 +99,9 @@ export default function AdminPage() {
     [],
   )
 
-  // search runs inside the destination you are on, so a query on the News page
+  // search runs inside the section you are on, so a query on the News page
   // never returns articles
-  const inView = view === 'news' ? news : articles
+  const inView = activeSection === 'news' ? news : articles
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return inView
@@ -76,75 +111,184 @@ export default function AdminPage() {
         p.category.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q),
     )
-  }, [posts, query])
+  }, [inView, query])
 
   if (!user) return <Navigate to="/" replace />
 
   const reset = () => setDoc(emptyDoc())
 
-  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * One path for every image the studio takes, cover or in-body. With a server
+   * this uploads and returns a URL; without one it becomes a data URL that only
+   * works in this browser, which is why the size cap applies only then.
+   */
+  const uploadImage = async (file: File): Promise<string | null> => {
+    if (!file.type.startsWith('image/')) {
+      setFlash('That file is not an image.')
+      return null
+    }
+    if (!usingDatabase && file.size > MAX_LOCAL_UPLOAD_BYTES) {
+      setFlash('Image is larger than 2 MB. Pick a smaller file or paste a URL instead.')
+      return null
+    }
+    try {
+      const url = await uploadCover(file)
+      setFlash('')
+      return url
+    } catch (err) {
+      setFlash(messageFrom(err, 'That image could not be uploaded.'))
+      return null
+    }
+  }
+
+  const onPickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      setFlash('That file is not an image.')
-      return
-    }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setFlash('Image is larger than 2 MB. Pick a smaller file or paste a URL instead.')
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = () => {
-      setDoc((d) => ({ ...d, cover: String(reader.result) }))
-      setFlash('')
-    }
-    reader.readAsDataURL(file)
+    const cover = await uploadImage(file)
+    if (cover) setDoc((d) => ({ ...d, cover }))
   }
 
-  const readMinutes = estimateReadMinutes(doc.blocks.map((b) => b.text).join(' '))
+  // alt text is not read by the reader, and ** markers are not words
+  const readMinutes = estimateReadMinutes(
+    plainText(
+      doc.blocks
+        .filter((b) => b.type !== 'image')
+        .map((b) => b.text)
+        .join(' '),
+    ),
+  )
 
-  const publish = () => {
-    const slugBase = slugify(doc.title)
-    const slug = loadCmsPosts().some((p) => p.slug === slugBase)
-      ? `${slugBase}-${Date.now().toString(36).slice(-4)}`
-      : slugBase
-    const paragraphs = doc.blocks.map((b) => b.text.trim()).filter(Boolean)
+  const publish = async () => {
+    // editing keeps what the editor cannot express — the publication date and
+    // the SEO keywords — so saving a seeded article does not strip them
+    const original = doc.slug ? posts.find((p) => p.slug === doc.slug) : undefined
+    const sections = sectionsFromBlocks(doc.blocks)
+    const title = doc.title.trim()
+
     const post: Post = {
       kind: doc.kind,
-      slug,
-      title: doc.title.trim(),
+      slug: doc.slug ?? slugify(title),
+      title,
       description: doc.description.trim(),
       category: doc.category.trim() || (doc.kind === 'news' ? 'News' : 'Insights'),
-      date: today,
+      date: original?.date ?? today,
       readMinutes,
       cover: doc.cover.trim() || DEFAULT_COVER,
-      coverAlt: doc.title.trim(),
-      keywords: [],
-      sections: [{ paragraphs: paragraphs.length ? paragraphs : [doc.description.trim()] }],
+      coverAlt: original?.coverAlt || title,
+      keywords: original?.keywords ?? [],
+      // an article with nothing but a cover still needs a body; fall back to
+      // the summary rather than publishing an empty page
+      sections: sections.length ? sections : [{ paragraphs: [doc.description.trim()] }],
     }
+
+    setSaving(true)
     try {
-      saveCmsPost(post)
-    } catch {
-      setFlash('Could not save. Browser storage is full. Try a smaller cover image.')
-      return
+      const saved = await savePost(post, doc.slug)
+      await reload()
+      reset()
+      setFlash(
+        doc.slug
+          ? `Saved changes to “${saved.title}”.`
+          : `Published “${saved.title}”. It is now live on the Resources page.`,
+      )
+      // land on the shelf the piece went to, showing it in the list
+      setSection(doc.kind === 'news' ? 'news' : 'articles')
+      setEditing(false)
+    } catch (err) {
+      setFlash(
+        messageFrom(
+          err,
+          usingDatabase
+            ? 'Could not save. Check your connection and try again.'
+            : 'Could not save. Browser storage is full. Try a smaller cover image.',
+        ),
+      )
+    } finally {
+      setSaving(false)
     }
-    setPosts(loadCmsPosts())
-    reset()
-    setFlash(`Published “${post.title}”. It is now live on the Resources page.`)
-    setView(doc.kind === 'news' ? 'news' : 'posts')
   }
 
-  const remove = (slug: string) => {
-    deleteCmsPost(slug)
-    setPosts(loadCmsPosts())
+  /** open the editor on an existing piece, under its own section */
+  const edit = (post: Post) => {
+    setDoc(docFromPost(post))
+    setFlash('')
+    setSection(kindOf(post) === 'news' ? 'news' : 'articles')
+    setEditing(true)
   }
 
-  const NAV: { id: View; n: string; label: string; icon: typeof FileText; count?: number }[] = [
+  /** open the editor on a blank piece of the given kind */
+  const startNew = (kind: PostKind) => {
+    setDoc({ ...emptyDoc(), kind })
+    setFlash('')
+    setSection(kind === 'news' ? 'news' : 'articles')
+    setEditing(true)
+  }
+
+  /** leave the editor for the list of the section you were writing in */
+  const closeEditor = () => {
+    setSection(doc.kind === 'news' ? 'news' : 'articles')
+    setEditing(false)
+  }
+
+  /**
+   * The rail can now be used while the editor is open, and every destination
+   * on it discards what is in the editor. Nothing is auto-saved, so ask first
+   * — but only when there is actually something to lose.
+   */
+  const canLeaveEditor = () => {
+    if (!editing) return true
+    const written =
+      doc.title.trim() !== '' ||
+      doc.description.trim() !== '' ||
+      doc.blocks.some((b) => b.text.trim() !== '')
+    return !written || window.confirm('Leave this piece? Anything not published will be lost.')
+  }
+
+  const remove = async (post: Post) => {
+    // deleting now writes to the database, and nothing here can undo it
+    if (!window.confirm(`Delete “${post.title}”? This cannot be undone.`)) return
+    try {
+      await removePost(post.slug)
+      await reload()
+      setFlash(`Deleted “${post.title}”.`)
+    } catch (err) {
+      setFlash(messageFrom(err, 'Could not delete that article.'))
+    }
+  }
+
+  const NAV: {
+    id: Section
+    n: string
+    label: string
+    icon: typeof FileText
+    count?: number
+    /** the shelf sections carry a list and a writer beneath them */
+    kind?: PostKind
+    newLabel?: string
+    allLabel?: string
+  }[] = [
     { id: 'overview', n: '01', label: 'Overview', icon: LayoutGrid },
-    { id: 'posts', n: '02', label: 'Articles', icon: FileText, count: articles.length },
-    { id: 'news', n: '03', label: 'News', icon: Newspaper, count: news.length },
-    { id: 'new', n: '04', label: 'Write new', icon: PenSquare },
+    {
+      id: 'articles',
+      n: '02',
+      label: 'Articles',
+      icon: FileText,
+      count: articles.length,
+      kind: 'article',
+      allLabel: 'All articles',
+      newLabel: 'New article',
+    },
+    {
+      id: 'news',
+      n: '03',
+      label: 'News',
+      icon: Newspaper,
+      count: news.length,
+      kind: 'news',
+      allLabel: 'All news',
+      newLabel: 'New news entry',
+    },
   ]
 
   return (
@@ -175,9 +319,14 @@ export default function AdminPage() {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value)
-                  if (e.target.value) setView('posts')
+                  // searching means browsing: leave the editor, and leave
+                  // Overview for a shelf that actually has results to show
+                  if (e.target.value) {
+                    setEditing(false)
+                    if (activeSection === 'overview') setSection('articles')
+                  }
                 }}
-                placeholder="Search articles"
+                placeholder={activeSection === 'news' ? 'Search news' : 'Search articles'}
                 className="w-full bg-transparent text-[13px] text-navy-950 placeholder:text-gray-400 outline-none"
               />
             </div>
@@ -186,47 +335,90 @@ export default function AdminPage() {
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-4">
           {NAV.map((item) => {
-            const active = view === item.id
+            const active = activeSection === item.id
             const Icon = item.icon
+            // a shelf opens to show its list and its writer; Overview has neither
+            const expanded = active && railOpen && item.kind !== undefined
             return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setView(item.id)}
-                aria-current={active ? 'page' : undefined}
-                title={railOpen ? undefined : item.label}
-                className={`group flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
-                  active
-                    ? 'bg-blue-brand/[0.10] text-blue-brand'
-                    : 'text-gray-600 hover:bg-navy-950/[0.04] hover:text-navy-950'
-                } ${railOpen ? '' : 'justify-center px-0'}`}
-              >
-                {railOpen && (
-                  <span className="w-5 shrink-0 font-mono text-[10px] tracking-[0.1em] text-gray-400">
-                    {item.n}
-                  </span>
-                )}
-                <span
-                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition-colors ${
+              <div key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!canLeaveEditor()) return
+                    setSection(item.id)
+                    setEditing(false)
+                  }}
+                  aria-current={active && !editing ? 'page' : undefined}
+                  aria-expanded={item.kind ? active : undefined}
+                  title={railOpen ? undefined : item.label}
+                  className={`group flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
                     active
-                      ? 'border-blue-brand/25 bg-blue-brand/[0.12] text-blue-brand'
-                      : 'border-navy-950/10 bg-white text-gray-500 group-hover:text-navy-950'
-                  }`}
+                      ? 'bg-blue-brand/[0.10] text-blue-brand'
+                      : 'text-gray-600 hover:bg-navy-950/[0.04] hover:text-navy-950'
+                  } ${railOpen ? '' : 'justify-center px-0'}`}
                 >
-                  <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
-                </span>
-                {railOpen && (
-                  <>
-                    <span className="flex-1 truncate text-[13.5px] font-medium">{item.label}</span>
-                    {item.count !== undefined && (
-                      <span className="rounded-md bg-navy-950/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-gray-500">
-                        {item.count}
-                      </span>
-                    )}
-                    <ChevronRight size={13} className="shrink-0 text-gray-300" aria-hidden="true" />
-                  </>
+                  {railOpen && (
+                    <span className="w-5 shrink-0 font-mono text-[10px] tracking-[0.1em] text-gray-400">
+                      {item.n}
+                    </span>
+                  )}
+                  <span
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition-colors ${
+                      active
+                        ? 'border-blue-brand/25 bg-blue-brand/[0.12] text-blue-brand'
+                        : 'border-navy-950/10 bg-white text-gray-500 group-hover:text-navy-950'
+                    }`}
+                  >
+                    <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
+                  </span>
+                  {railOpen && (
+                    <>
+                      <span className="flex-1 truncate text-[13.5px] font-medium">{item.label}</span>
+                      {item.count !== undefined && (
+                        <span className="rounded-md bg-navy-950/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-gray-500">
+                          {item.count}
+                        </span>
+                      )}
+                      <ChevronRight
+                        size={13}
+                        aria-hidden="true"
+                        className={`shrink-0 text-gray-300 transition-transform ${
+                          expanded ? 'rotate-90' : ''
+                        }`}
+                      />
+                    </>
+                  )}
+                </button>
+
+                {/* the section's own destinations, hung off a rule so they read
+                    as belonging to the shelf above rather than as siblings */}
+                {expanded && (
+                  <div className="mt-1 mb-1 ml-[2.35rem] flex flex-col gap-0.5 border-l border-navy-950/10 pl-3">
+                    <SubItem
+                      label={item.allLabel!}
+                      active={!editing}
+                      onClick={() => canLeaveEditor() && setEditing(false)}
+                    />
+                    {/* the same slot, told truthfully: reworking a published
+                        piece is not the same destination as starting one */}
+                    <SubItem
+                      label={
+                        editing && doc.slug
+                          ? item.kind === 'news'
+                            ? 'Editing news entry'
+                            : 'Editing article'
+                          : item.newLabel!
+                      }
+                      active={editing}
+                      icon={editing && doc.slug ? Pencil : PenSquare}
+                      onClick={() => {
+                        if (editing && doc.slug) return // already here
+                        if (canLeaveEditor()) startNew(item.kind!)
+                      }}
+                    />
+                  </div>
                 )}
-              </button>
+              </div>
             )
           })}
         </nav>
@@ -234,7 +426,9 @@ export default function AdminPage() {
         <div className="border-t border-navy-950/10 px-5 py-4">
           {railOpen && (
             <p className="font-mono text-[8.5px] leading-relaxed tracking-[0.1em] text-gray-400 uppercase">
-              Demo studio. Articles are saved in this browser only, no backend yet.
+              {usingDatabase
+                ? 'Connected to the content database. Everything you publish is live.'
+                : 'Demo studio. Articles are saved in this browser only, no backend yet.'}
             </p>
           )}
           <button
@@ -271,51 +465,89 @@ export default function AdminPage() {
             </p>
           )}
 
-          {view === 'overview' && (
-            <Overview posts={posts} onWrite={() => setView('new')} onBrowse={() => setView('posts')} />
+          {/* the library could not be fetched: say so plainly, because what is
+              listed below is then stale or empty rather than wrong */}
+          {error && (
+            <p className="mt-6 border-l-2 border-red-400 bg-white px-4 py-3 text-sm text-navy-950">
+              {error}{' '}
+              <button
+                type="button"
+                onClick={() => void reload()}
+                className="cursor-pointer font-semibold text-teal-brand underline underline-offset-2"
+              >
+                Try again
+              </button>
+            </p>
           )}
 
-          {view === 'posts' && (
-            <Library
-              posts={filtered}
-              total={articles.length}
-              query={query}
-              onRemove={remove}
-              onWrite={() => {
-                setDoc((d) => ({ ...d, kind: 'article' }))
-                setView('new')
-              }}
-              kind="article"
-            />
-          )}
-
-          {view === 'news' && (
-            <Library
-              posts={filtered}
-              total={news.length}
-              query={query}
-              onRemove={remove}
-              onWrite={() => {
-                setDoc((d) => ({ ...d, kind: 'news' }))
-                setView('new')
-              }}
-              kind="news"
-            />
-          )}
-
-          {view === 'new' && (
-            <PostEditor
-              doc={doc}
-              setDoc={setDoc}
-              onPublish={publish}
-              onExit={() => setView(doc.kind === 'news' ? 'news' : 'posts')}
-              readMinutes={readMinutes}
-              onPickImage={onPickImage}
-            />
+          {loading ? (
+            <p className="mt-10 font-mono text-[11px] tracking-[0.2em] text-gray-500 uppercase">
+              Loading the library…
+            </p>
+          ) : (
+            <>
+              {editing ? (
+                <PostEditor
+                  doc={doc}
+                  setDoc={setDoc}
+                  onPublish={() => void publish()}
+                  onExit={closeEditor}
+                  readMinutes={readMinutes}
+                  onPickImage={onPickImage}
+                  uploadImage={uploadImage}
+                  saving={saving}
+                />
+              ) : activeSection === 'overview' ? (
+                <Overview
+                  posts={posts}
+                  onWrite={() => startNew('article')}
+                  onBrowse={() => setSection('articles')}
+                />
+              ) : (
+                <Library
+                  posts={filtered}
+                  total={activeSection === 'news' ? news.length : articles.length}
+                  query={query}
+                  onRemove={remove}
+                  onEdit={edit}
+                  onWrite={() => startNew(activeSection === 'news' ? 'news' : 'article')}
+                  kind={activeSection === 'news' ? 'news' : 'article'}
+                />
+              )}
+            </>
           )}
         </div>
       </main>
     </div>
+  )
+}
+
+/** a destination inside a rail section: the list, or the writer */
+function SubItem({
+  label,
+  active,
+  onClick,
+  icon: Icon,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+  icon?: typeof PenSquare | typeof Pencil
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={`flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors ${
+        active
+          ? 'font-semibold text-blue-brand'
+          : 'text-gray-500 hover:bg-navy-950/[0.04] hover:text-navy-950'
+      }`}
+    >
+      {Icon && <Icon size={12} strokeWidth={1.75} aria-hidden="true" />}
+      <span className="truncate">{label}</span>
+    </button>
   )
 }
 
@@ -335,7 +567,7 @@ function Overview({ posts, onWrite, onBrowse }: { posts: Post[]; onWrite: () => 
   return (
     <>
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
-        <Stat n={posts.length} label="Articles" sub="published from this studio" />
+        <Stat n={posts.length} label="Articles" sub="live on the Resources page" />
         <Stat n={categories} label="Categories" sub="in use across the library" />
         <Stat n={minutes} label="Minutes" sub="of reading published" />
       </div>
@@ -381,6 +613,7 @@ function Library({
   total,
   query,
   onRemove,
+  onEdit,
   onWrite,
   kind = 'article',
 }: {
@@ -388,7 +621,8 @@ function Library({
   total: number
   query: string
   kind?: 'article' | 'news'
-  onRemove: (slug: string) => void
+  onRemove: (post: Post) => void
+  onEdit: (post: Post) => void
   onWrite: () => void
 }) {
   const noun = kind === 'news' ? 'News' : 'Articles'
@@ -402,12 +636,26 @@ function Library({
             {query ? `${posts.length} of ${total}` : total}
           </span>
         </h2>
-        <Link
-          to="/resources"
-          className="inline-flex items-center gap-1.5 border border-navy-950/10 bg-white px-4 py-2 text-xs font-semibold tracking-wide text-navy-950 uppercase transition-colors hover:border-teal-brand/50 hover:text-teal-brand"
-        >
-          View resources <ArrowUpRight size={13} />
-        </Link>
+        {/* Writing is the reason to be on this screen, so the action sits here
+            rather than only in the rail — and it has to be present once the
+            library has something in it, which is when the empty state's own
+            button disappears. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/resources"
+            className="inline-flex items-center gap-1.5 border border-navy-950/10 bg-white px-4 py-2 text-xs font-semibold tracking-wide text-navy-950 uppercase transition-colors hover:border-teal-brand/50 hover:text-teal-brand"
+          >
+            View resources <ArrowUpRight size={13} />
+          </Link>
+          <button
+            type="button"
+            onClick={onWrite}
+            className="inline-flex cursor-pointer items-center gap-1.5 bg-blue-brand px-4 py-2 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-teal-brand"
+          >
+            <PenSquare size={13} aria-hidden="true" />
+            New {kind === 'news' ? 'news entry' : 'article'}
+          </button>
+        </div>
       </div>
 
       {total === 0 ? (
@@ -442,7 +690,15 @@ function Library({
               </Link>
               <button
                 type="button"
-                onClick={() => onRemove(p.slug)}
+                onClick={() => onEdit(p)}
+                aria-label={`Edit ${p.title}`}
+                className="shrink-0 cursor-pointer text-gray-400 transition-colors hover:text-teal-brand"
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onRemove(p)}
                 aria-label={`Delete ${p.title}`}
                 className="shrink-0 cursor-pointer text-gray-400 transition-colors hover:text-red-500"
               >

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Plus } from 'lucide-react'
 import { SectionHeading } from '../components/site/Section'
 import TiltCard from '../components/site/TiltCard'
-import { POSTS, getArticles, getNews } from '../lib/posts'
+import { useArticles, useNews, usePosts } from '../lib/postsStore'
 import { usePageMeta, SITE_URL } from '../lib/seo'
 
 /**
@@ -13,6 +13,14 @@ import { usePageMeta, SITE_URL } from '../lib/seo'
  */
 
 export default function ResourcesPage() {
+  // Resources carries two things now: the evergreen insights library, and the
+  // newsroom. They share a shape but not a job — one is written to be found by
+  // search months later, the other is dated and read once — so they get their
+  // own bands rather than being interleaved in one feed.
+  const { posts, loading } = usePosts()
+  const articles = useArticles()
+  const news = useNews()
+
   usePageMeta({
     title: 'Resources & Insights · Solar EV Charging, Microgrids & Distributed Energy · Teask',
     description:
@@ -24,7 +32,7 @@ export default function ResourcesPage() {
       name: 'Teask Resources & Insights',
       url: `${SITE_URL}/resources`,
       publisher: { '@type': 'Organization', name: 'Teask, Tenaga Alam Sekitar Kita', url: SITE_URL },
-      blogPost: POSTS.map((p) => ({
+      blogPost: posts.map((p) => ({
         '@type': 'BlogPosting',
         headline: p.title,
         url: `${SITE_URL}/resources/${p.slug}`,
@@ -32,13 +40,6 @@ export default function ResourcesPage() {
       })),
     },
   })
-
-  // Resources carries two things now: the evergreen insights library, and the
-  // newsroom. They share a shape but not a job — one is written to be found by
-  // search months later, the other is dated and read once — so they get their
-  // own bands rather than being interleaved in one feed.
-  const articles = getArticles()
-  const news = getNews()
 
   // Three rows of the phone's two-up grid, then the rest on request. Every post
   // stays in the DOM order it was rendered in, so "Load more" only ever appends
@@ -70,6 +71,20 @@ export default function ResourcesPage() {
               the CTA, so those stay hidden below md. The whole card is the link,
               so the target is large even though the type is small. */}
           <div className="mt-10 grid grid-cols-2 gap-3 md:mt-14 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
+            {/* the library is fetched, so hold the grid's shape while it
+                arrives rather than collapsing the page and pushing it back */}
+            {loading &&
+              Array.from({ length: 6 }, (_, i) => (
+                <div key={`skeleton-${i}`} className="animate-pulse border border-navy-950/[0.06]">
+                  <div className="aspect-[16/9] w-full bg-navy-950/[0.06]" />
+                  <div className="space-y-2 p-3 md:p-6">
+                    <div className="h-2 w-1/3 bg-navy-950/[0.06]" />
+                    <div className="h-3 w-full bg-navy-950/[0.08]" />
+                    <div className="h-3 w-2/3 bg-navy-950/[0.08]" />
+                  </div>
+                </div>
+              ))}
+
             {shown.map((p, i) => (
               <Link key={p.slug} to={`/resources/${p.slug}`} className="group block h-full">
                 <TiltCard className="p-0" delay={Math.min(i * 0.05, 0.3)}>

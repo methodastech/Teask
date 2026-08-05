@@ -1,0 +1,17 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # FastCGI/PHP-FPM drops the Authorization header before PHP sees it.
+  # Copy it into an environment variable the script can read instead.
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # Uploaded images are served straight off disk. Everything else — including
+  # config.php and the files under lib/ and routes/ — goes through the front
+  # controller, so none of it can be requested directly.
+  RewriteCond %{REQUEST_URI} !/uploads/
+  RewriteCond %{REQUEST_URI} !/seed\.php$
+  RewriteRule ^ index.php [QSA,L]
+</IfModule>
