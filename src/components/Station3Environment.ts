@@ -36,6 +36,19 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MODELS_BASE } from '../lib/station3Parts'
+import { breathe } from '../lib/breathe'
+
+/**
+ * Thrown when the scene is torn down while the build is paused between stages.
+ * A named class so the caller can tell "the visitor navigated away" apart from
+ * "the environment failed to build", and stay quiet about the first.
+ */
+export class AbortError extends Error {
+  constructor() {
+    super('environment build aborted')
+    this.name = 'AbortError'
+  }
+}
 
 /**
  * The world the T Station sits in: a marked parking lot on a landscaped campus,
@@ -161,17 +174,34 @@ export interface PhotorealEnv {
   dispose: () => void
 }
 
-export function buildPhotorealEnvironment({
+/**
+ * Async, and deliberately so.
+ *
+ * Nothing here needs to await anything — every stage is synchronous work. It is
+ * async so that it can PAUSE between stages, because this runs while the intro
+ * descent is animating on the same thread and built as one unbroken task it made
+ * the descent skip. See `breathe` for why that shows up as a jump rather than a
+ * slowdown. The stage boundaries below are the `// ── section ──` comments that
+ * were already there; each one now ends with a chance for the browser to paint.
+ */
+export async function buildPhotorealEnvironment({
   scene,
   renderer,
   groundY,
   radius = 6,
   detail = 'model',
+  aborted,
 }: {
   scene: Scene
   renderer: WebGLRenderer
   groundY: number
   radius?: number
+  /**
+   * Checked after every pause. The build now spans many frames, so the component
+   * can unmount half-way through it — without this the remaining stages would go
+   * on adding meshes to a scene that is already being torn down.
+   */
+  aborted?: () => boolean
   /**
    * 'model' is the architectural maquette: faceted planting, flat materials,
    * a monochrome palette. 'realistic' builds the same site to the standard of
@@ -183,7 +213,7 @@ export function buildPhotorealEnvironment({
    * footprint. Every dimension below is a real one.
    */
   detail?: 'model' | 'realistic'
-}): PhotorealEnv {
+}): Promise<PhotorealEnv> {
   const REAL = detail === 'realistic'
   const root = new Group()
   root.position.y = groundY
@@ -195,6 +225,16 @@ export function buildPhotorealEnvironment({
     return x
   }
   const rng = makeRng(9081)
+
+  /**
+   * End of a build stage: let a frame through, then bail out if the scene went
+   * away while we were waiting. Throwing rather than returning early keeps every
+   * call site a single line — the caller treats an abort as a rejected build.
+   */
+  const stage = async () => {
+    await breathe()
+    if (aborted?.()) throw new AbortError()
+  }
 
   // ── sky ───────────────────────────────────────────────────────────
   const skyCan = document.createElement('canvas')
@@ -365,6 +405,8 @@ export function buildPhotorealEnvironment({
     })
   }
 
+  await stage()
+
   // ── lighting ──────────────────────────────────────────────────────
   // Realistic drops the sun a little and warms it: 3.2 at 26 m up is a midday
   // light that flattens everything, where a lower angle rakes across the paving
@@ -372,7 +414,20 @@ export function buildPhotorealEnvironment({
   const sun = new DirectionalLight(0xfff2df, REAL ? 2.85 : 3.2)
   sun.position.set(-18, REAL ? 19 : 26, -8)
   sun.castShadow = true
-  sun.shadow.mapSize.set(REAL ? 4096 : 2048, REAL ? 4096 : 2048)
+  /**
+   * 1024 for the maquette, down from 2048.
+   *
+   * The map is spread over the frustum below, so at S = max(24, radius*6) ≈ 36 a
+   * 1024 map is a ~70 mm texel. That is finer than the softening PCF already
+   * applies, which is why the drop is not visible: the blur was hiding the extra
+   * resolution before it reached the screen. It quarters both the memory and the
+   * fill cost of every shadow render — and with 3.4 million triangles of parked
+   * bikes in the casting set, that pass is not cheap.
+   *
+   * The realistic build keeps 4096: it runs a tighter frustum (S = 30) and is
+   * meant to hold up to scrutiny rather than to run smoothly.
+   */
+  sun.shadow.mapSize.set(REAL ? 4096 : 1024, REAL ? 4096 : 1024)
   sun.shadow.camera.near = 1
   sun.shadow.camera.far = 120
   // Shadow resolution is the map spread over this frustum, so the frustum is the
@@ -392,6 +447,8 @@ export function buildPhotorealEnvironment({
   // gets its sky light from the HDRI instead, so this drops to a trace — leaving
   // it at 0.85 was lifting every shadow off the ground.
   scene.add(new HemisphereLight(0xd2ecff, 0x8a7a5a, REAL ? 0.12 : 0.85))
+
+  await stage()
 
   // ── ground: grass campus + the parking lot ────────────────────────
   const grassGeo = track(new PlaneGeometry(420, 420))
@@ -487,6 +544,8 @@ export function buildPhotorealEnvironment({
   centreLine.rotation.x = -Math.PI / 2
   centreLine.position.y = 0.02
   root.add(centreLine)
+
+  await stage()
 
   // ── low-poly kit ──────────────────────────────────────────────────
   const dummy = new Object3D()
@@ -698,6 +757,8 @@ export function buildPhotorealEnvironment({
     })
   }
 
+  await stage()
+
   // ── buildings ─────────────────────────────────────────────────────
   // Three archetypes, each its own instanced draw so the window grid stays the
   // right density for the block's height. Per-instance colour supplies the
@@ -770,6 +831,8 @@ export function buildPhotorealEnvironment({
       }
     }
   }
+
+  await stage()
 
   // ── the world ─────────────────────────────────────────────────────
   // 1 · cars in the outer bays only (a car near the camera would fill the frame)
@@ -890,6 +953,8 @@ export function buildPhotorealEnvironment({
     h.scale.set(s, s * (0.4 + rng() * 0.3), s)
     root.add(h)
   }
+
+  await stage()
 
   // ── traffic on the ring road ──────────────────────────────────────
   // One vehicle circulating is the cheapest possible sign of life; a completely
@@ -1174,6 +1239,8 @@ export function buildPhotorealEnvironment({
   }
   updateTraffic(0)
 
+  await stage()
+
   // ── instanced draws ───────────────────────────────────────────────
   const mkInstanced = (geo: BufferGeometry, mat: MeshStandardMaterial, list: Placement[]) => {
     if (!list.length) return null
@@ -1205,6 +1272,8 @@ export function buildPhotorealEnvironment({
     mkInstanced(boxGeo, bandMat, bands),
     mkInstanced(boxGeo, pvMat, pvs),
   ].filter(Boolean) as InstancedMesh[]
+
+  await stage()
 
   // ── image-based lighting from the sky ─────────────────────────────
   let envDispose = () => {}

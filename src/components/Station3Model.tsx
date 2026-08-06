@@ -35,7 +35,13 @@ import {
 } from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { buildPhotorealEnvironment, type PhotorealEnv } from './Station3Environment'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+// emitted as hashed assets by Vite; see setDecoderPath below for why both are
+// named explicitly rather than handed a directory
+import dracoWrapperUrl from 'three/examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js?url'
+import dracoWasmUrl from 'three/examples/jsm/libs/draco/gltf/draco_decoder.wasm?url'
+import { AbortError, buildPhotorealEnvironment, type PhotorealEnv } from './Station3Environment'
+import { breathe } from '../lib/breathe'
 import { setupPost, type PostChain } from './Station3Post'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
@@ -1138,6 +1144,10 @@ export default function Station3Model({
         // both legs carry the embossed logo, lift it before the merge
         const emblems =
           group.id === 'legs' ? (geos.map(extractEmblem).filter(Boolean) as Emblem[]) : []
+        // the merge walks every vertex of the group; the seven groups resolve
+        // together, so without this they queue into one task like the loop below
+        await breathe()
+        if (disposed) return null
         const merged = mergeGeometries(geos, false) ?? geos[0]
         geos.forEach((g) => g.dispose())
         merged.computeBoundingBox()
@@ -1145,10 +1155,21 @@ export default function Station3Model({
         return { group, merged, subLocal, emblems }
       }),
     )
-      .then((results) => {
+      .then(async (results) => {
         if (disposed) return
-        results.forEach((r) => {
-          if (!r) return
+        /**
+         * A for-of that can await, rather than a forEach.
+         *
+         * Each iteration merges a group's geometry and runs EdgesGeometry over
+         * it, which walks every triangle looking for silhouette edges. Seven of
+         * those back to back is the second-longest block in the load, and like
+         * the environment build it used to run as one task underneath the intro
+         * descent. Pausing between groups costs seven frames and stops the
+         * descent skipping.
+         */
+        for (const r of results) {
+          if (disposed) return
+          if (!r) continue
           const { group, merged, subLocal } = r
           disposables.push(merged)
 
@@ -1261,12 +1282,19 @@ export default function Station3Model({
             focusNearest: group.focusNearest,
             subLocal,
           })
-        })
-        scooterReady.then(finalize)
+          await breathe()
+        }
+        await scooterReady
+        if (disposed) return
+        await finalize()
       })
-      .catch((err) => console.error('[Station3Model] load failed', err))
+      .catch((err) => {
+        // an abort is the component unmounting mid-build, which is not a fault
+        if (err instanceof AbortError || disposed) return
+        console.error('[Station3Model] load failed', err)
+      })
 
-    const finalize = () => {
+    const finalize = async () => {
       model.updateMatrixWorld(true)
       const box = new Box3().setFromObject(model)
       const center = box.getCenter(new Vector3())
@@ -1282,12 +1310,15 @@ export default function Station3Model({
         // real site: paving, planting, sky. The blueprint grid and its wireframe
         // surroundings stay off entirely.
         grid.visible = false
-        photoreal = buildPhotorealEnvironment({
+        // spans several frames now, pausing between stages so the intro descent
+        // running over the top of this keeps getting its frames
+        photoreal = await buildPhotorealEnvironment({
           scene,
           renderer,
           groundY: grid.position.y,
           radius: boundR,
           detail: heroStyle === 'realistic' ? 'realistic' : 'model',
+          aborted: () => disposed,
         })
         // aim the sun at the unit so its shadow frustum is centred on the subject
         photoreal.sun.target.position.set(0, grid.position.y, 0)
@@ -1825,11 +1856,38 @@ export default function Station3Model({
           if (buf.byteLength < 4 || new DataView(buf).getUint32(0, false) !== 0x676c5446) {
             throw new Error('not a glb')
           }
-          new GLTFLoader().parse(
+          /**
+           * Draco-compressed, so the loader needs the decoder wired in or the
+           * parse fails outright and we fall back to the STL bike — silently,
+           * since that fallback is a legitimate branch. It buys back 11MB of
+           * vertex data for a 192KB wasm fetched once and cached.
+           *
+           * The decoder URLs come through Vite's `?url` rather than a hand-copied
+           * folder in public/: the files get hashed and versioned like any other
+           * asset, they follow the app's base path automatically, and they cannot
+           * drift out of sync with whatever three version is installed.
+           *
+           * The object form of setDecoderPath matters — it sets `dep_js` to null.
+           * The string form additionally resolves `draco_decoder.js`, a 512KB
+           * pure-JS fallback this scene has no use for, and fetches it eagerly.
+           */
+          const gl = new GLTFLoader()
+          const draco = new DRACOLoader()
+          draco.setDecoderPath({ js: dracoWrapperUrl, wasm: dracoWasmUrl })
+          gl.setDRACOLoader(draco)
+          gl.parse(
             buf,
             '',
-            (gltf) => parkBikeRow(gltf.scene),
-            () => parkStlBike(),
+            (gltf) => {
+              parkBikeRow(gltf.scene)
+              // the worker pool is per-loader, and this is the only Draco asset
+              // in the scene — holding it open past the one parse leaks a thread
+              draco.dispose()
+            },
+            () => {
+              draco.dispose()
+              parkStlBike()
+            },
           )
         })
         .catch(parkStlBike)
@@ -1837,6 +1895,25 @@ export default function Station3Model({
       mountScreen()
       mountSockets()
       resize()
+
+      /**
+       * Compile every shader in the scene BEFORE reporting ready.
+       *
+       * Compilation is a synchronous stall inside the graphics driver, and three
+       * does it lazily — the first time a material is actually drawn. Left alone
+       * that means the whole scene's shaders compile during the first rendered
+       * frame, which is precisely the frame the intro hands over on. All the care
+       * taken over the descent and the fade is spent, and then the reveal opens
+       * on a locked-up tab.
+       *
+       * `compileAsync` moves it earlier, into the window where a full-screen
+       * animation is already covering for us. Where the driver supports
+       * KHR_parallel_shader_compile it also gets to do the work off-thread; where
+       * it does not, this is still a stall — just a stall nobody can see.
+       */
+      await renderer.compileAsync(scene, camera)
+      if (disposed) return
+
       onReady?.()
       startLoop()
     }

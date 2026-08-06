@@ -8,11 +8,9 @@ import {
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { OutputShader } from 'three/examples/jsm/shaders/OutputShader.js'
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
-import { Vector2 } from 'three'
 
 /**
  * The render pipeline that separates "a 3D model on a page" from "a product
@@ -181,13 +179,24 @@ export function setupPost({
       bokehSetSize(Math.max(1, Math.round(w * DEPTH_SCALE)), Math.max(1, Math.round(h * DEPTH_SCALE)))
     composer.addPass(bokeh)
 
-    const bloom = new UnrealBloomPass(
-      new Vector2(width, height),
-      0.085, // strength — a sheen, not a flare
-      0.6, // radius
-      0.96, // threshold: only pixels already at clipping bloom at all
-    )
-    composer.addPass(bloom)
+    /**
+     * Bloom, removed.
+     *
+     * It ran at strength 0.085 with the threshold at 0.96 — only pixels already
+     * within 4% of clipping contributed anything, and then only at 8% strength.
+     * For that it cost ten render passes: five progressive downsamples, five
+     * upsamples and a composite, every frame. Measured against the grade's own
+     * highlight rolloff the difference was not findable by eye, so it is ten
+     * passes bought nothing.
+     *
+     * Kept as a comment rather than deleted because the judgement was "invisible
+     * at these settings", not "wrong idea" — if the scene ever gains a genuinely
+     * emissive element (a lit sign, headlamps at dusk) this is where it goes
+     * back, and it should come back at a strength you can actually see.
+     *
+     *   const bloom = new UnrealBloomPass(new Vector2(width, height), 0.085, 0.6, 0.96)
+     *   composer.addPass(bloom)   // and forward setSize to it
+     */
 
     composer.addPass(new GradedOutputPass())
 
