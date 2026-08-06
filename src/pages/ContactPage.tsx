@@ -18,7 +18,25 @@ const FIELD =
   'w-full border border-navy-950/10 bg-navy-950/[0.04] px-4 py-3 text-sm text-navy-950 placeholder:text-gray-500 outline-none transition-colors focus:border-teal-brand/60'
 
 const EMAIL = 'kiu@teask.asia'
-const CONTACT_ENDPOINT = import.meta.env.VITE_CONTACT_ENDPOINT as string | undefined
+/**
+ * Where the form posts.
+ *
+ * The endpoint ships WITH the site — public/api/contact.php becomes
+ * dist/api/contact.php — so in a production build it is always at this relative
+ * path, on the same origin, whatever domain the site is served from. That makes
+ * it a fact about the app rather than configuration, so it lives here instead of
+ * in an env file that `.gitignore` would drop on the next clone.
+ *
+ * Development deliberately gets nothing: the Vite dev server cannot execute PHP,
+ * so posting there would only ever fail. Undefined sends the form down its
+ * mail-client fallback instead, which works locally.
+ *
+ * VITE_CONTACT_ENDPOINT still overrides both, for pointing at Formspree or a
+ * staging endpoint without touching code.
+ */
+const CONTACT_ENDPOINT =
+  (import.meta.env.VITE_CONTACT_ENDPOINT as string | undefined) ||
+  (import.meta.env.PROD ? '/api/contact.php' : undefined)
 
 /**
  * Why someone is writing. Asked up front because it changes what we need from
@@ -94,6 +112,9 @@ export default function ContactPage() {
       organisation: String(data.get('org') ?? ''),
       email: String(data.get('email') ?? ''),
       message: String(data.get('message') ?? ''),
+      // the honeypot; empty for anyone who filled this in by hand. Sent rather
+      // than checked here, because the check belongs where it cannot be skipped
+      website: String(data.get('website') ?? ''),
     }
 
     if (CONTACT_ENDPOINT) {
@@ -329,6 +350,27 @@ export default function ContactPage() {
                     // the prompt follows the purpose, so the field asks for what we actually need
                     placeholder={active.prompt}
                     className={`${FIELD} mt-4 resize-y`}
+                  />
+
+                  {/*
+                    Honeypot. Bots fill every field they can find; people never
+                    see this one, so anything in it identifies a script and the
+                    server drops the submission.
+
+                    Hidden with an off-screen position rather than `display:none`
+                    or `hidden`: the cruder bots skip anything obviously
+                    undisplayed, and this way it is still a real, focusable,
+                    fillable field to anything walking the DOM. `aria-hidden` and
+                    negative tabindex keep it away from screen readers and from
+                    the keyboard order, so it costs nothing in accessibility.
+                  */}
+                  <input
+                    name="website"
+                    type="text"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    autoComplete="off"
+                    className="pointer-events-none absolute -left-[9999px] h-0 w-0 opacity-0"
                   />
 
                   {status === 'error' && (
