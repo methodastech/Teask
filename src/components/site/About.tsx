@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { SectionHeading } from './Section'
 import RecordTimeline from './RecordTimeline'
 import Story from './Story'
@@ -57,56 +56,59 @@ const BLOCK_CLIP = `polygon(${LEAN}% 0%, 100% 0%, ${100 - LEAN}% 100%, 0% 100%)`
  */
 const LEAN_PX = 34
 const BLOCK_TOP = 20 // % of panel height where the block starts
-const FIG_TOP = 7 // % of panel height where the portrait starts
+/** portrait height as a % of the panel, before each subject's own headScale */
+const FIG_H = 93
 
 const BLOCK_CLIP_FLUID = `polygon(${LEAN_PX}px 0%, 100% 0%, calc(100% - ${LEAN_PX}px) 100%, 0% 100%)`
+
+/**
+ * Where a portrait starts, and the clip that goes with it, for a given scale.
+ *
+ * The portrait is pinned to the block's floor, so its height is what decides
+ * its top — hence the pair being computed together. The clip has to be derived
+ * per subject too: it walks the block's edges up from BLOCK_TOP to wherever
+ * that portrait begins, and once the portraits start at different heights, so
+ * does the walk.
+ *
+ * Scaling is applied by moving the wrapper's top rather than by growing the
+ * image inside it. The wrapper's clip has no open top — anything taller than
+ * the box gets cut — so a scaled-up image would simply lose its crown.
+ */
+function figurePlacement(figH: number, blockTop: number, scale: number) {
+  const top = 100 - figH * scale
+  const overshoot = (blockTop - top) / (100 - blockTop)
+  return {
+    top: `${top.toFixed(2)}%`,
+    clip:
+      `polygon(${(LEAN_PX * (1 + overshoot)).toFixed(2)}px 0%, ` +
+      `calc(100% + ${(LEAN_PX * overshoot).toFixed(2)}px) 0%, ` +
+      `calc(100% - ${LEAN_PX}px) 100%, 0px 100%)`,
+  }
+}
 
 /** the caption's inset: clear of the rake, plus a margin */
 const CAPTION_PAD = LEAN_PX + 14
 
-/**
- * The bio is set at ONE fixed width, never at a share of its panel.
+/* ── the fixed grid's equivalent ───────────────────────────────────────────
  *
- * This is what makes the reveal smooth. A percentage width re-resolves on every
- * frame of the 600ms flex-grow animation, so the paragraph re-wraps ~36 times
- * on the way open — the line count keeps changing under the text and it reads
- * as the copy re-typesetting itself rather than appearing. Fixed, it is laid
- * out once and the widening panel simply uncovers it.
- *
- * 360px is sized off the tightest case, the expanded panel at the xl breakpoint
- * itself: a 1184px row gives the open panel 2/5 = 474px, less 2 x 48px of
- * inset leaves 378px. Wider viewports leave it alone rather than stretching it,
- * which also keeps the measure readable instead of letting it run long.
- */
-const BIO_WIDTH = 360
-
-/**
- * The wrapper spans from FIG_TOP to the floor while the block spans from
- * BLOCK_TOP, so the same two edges have to be walked up that extra distance to
- * stay collinear. Only the sides are cut — the top is left open so the crown
- * still breaks the block's edge, and the bottom needs no cut since the two
- * already share a floor.
- */
-const OVERSHOOT = (BLOCK_TOP - FIG_TOP) / (100 - BLOCK_TOP)
-const FIGURE_WRAP_CLIP =
-  `polygon(${(LEAN_PX * (1 + OVERSHOOT)).toFixed(2)}px 0%, ` +
-  `calc(100% + ${(LEAN_PX * OVERSHOOT).toFixed(2)}px) 0%, ` +
-  `calc(100% - ${LEAN_PX}px) 100%, 0px 100%)`
-
-/* ── the fixed grid's equivalents ──────────────────────────────────────────
- *
- * Same wrapper trick, but in % rather than px: every column in the grid is the
- * same width, so a proportional lean keeps one slant across the row, and it
- * stays sensible down at a ~160px phone column where a 34px lean would read as
- * a 21% rake.
+ * Same placement, but the lean is in % rather than px: every column in the grid
+ * is the same width, so a proportional lean keeps one slant across the row, and
+ * it stays sensible down at a ~160px phone column.
  */
 const BLOCK_TOP_GRID = 16
-const FIG_TOP_GRID = 4
-const OVERSHOOT_GRID = (BLOCK_TOP_GRID - FIG_TOP_GRID) / (100 - BLOCK_TOP_GRID)
-const FIGURE_WRAP_CLIP_GRID =
-  `polygon(${(LEAN * (1 + OVERSHOOT_GRID)).toFixed(2)}% 0%, ` +
-  `${(100 + LEAN * OVERSHOOT_GRID).toFixed(2)}% 0%, ` +
-  `${100 - LEAN}% 100%, 0% 100%)`
+const FIG_H_GRID = 96
+
+function figurePlacementGrid(scale: number) {
+  const top = 100 - FIG_H_GRID * scale
+  const overshoot = (BLOCK_TOP_GRID - top) / (100 - BLOCK_TOP_GRID)
+  return {
+    top: `${top.toFixed(2)}%`,
+    clip:
+      `polygon(${(LEAN * (1 + overshoot)).toFixed(2)}% 0%, ` +
+      `${(100 + LEAN * overshoot).toFixed(2)}% 0%, ` +
+      `${100 - LEAN}% 100%, 0% 100%)`,
+  }
+}
 
 /**
  * The grid's rake correction, converted into the image's own width so it can
@@ -135,8 +137,8 @@ const BLOCK_GRADIENT =
  * frame. It is not decorative: the portraits are not consistently framed, and
  * centring the IMAGE therefore does not centre the FACE.
  *
- *   James       44.8%     Alexchandar  51.6%
- *   Kiu         46.3%     Mohammad     51.8%
+ *   James       45.1%     Alexchandar  51.6%
+ *   Kiu         47.3%     Mohammad     53.2%
  *
  * Re-measure whenever a portrait is replaced — it is a property of that file's
  * framing, not of the person.
@@ -146,6 +148,23 @@ const BLOCK_GRADIENT =
  * a head left of centre gets pushed into that edge, while one right of centre
  * happens to cancel it out. Centring on this value instead of on the file's
  * midpoint fixes both without touching the photographs.
+ *
+ * `headScale` levels how BIG each head reads. The four were shot at different
+ * distances, so at one figure height their heads come out different sizes —
+ * measured across the skull at its widest, before the shoulders start:
+ *
+ *   James       31.8%     Alexchandar  28.8%
+ *   Kiu         29.9%     Mohammad     32.8%
+ *
+ * Each scale is the four-way average over that subject's own width, then damped
+ * halfway back toward 1. The damping is not timidity: the measurement spans hair
+ * as well as skull, so a short-haired subject's width is nearly all head while a
+ * fuller-haired one's is not, and matching the raw widths visibly oversizes the
+ * first one's face — which is exactly what happened to Kiu at his undamped
+ * 1.048. Halving it landed where the eye agreed, so the same discipline is
+ * applied across all four.
+ *
+ * Re-measure alongside headCentre when a portrait is replaced, then check by eye.
  */
 const LEADERSHIP: {
   name: string
@@ -153,20 +172,23 @@ const LEADERSHIP: {
   bio: string
   image: string
   headCentre: number
+  headScale: number
 }[] = [
   {
     name: 'James Anthony Tan',
-    role: 'Co-Founder · Chief Executive Officer',
+    role: 'Chief Executive Officer',
     bio: 'Honorary Captain and Guinness World Record holder (2013): the youngest person, and the first Malaysian, to circumnavigate the world solo by aircraft. James leads vision, strategic partnerships, technology commercialisation and long-term growth.',
     image: '/images/founders/james-anthony-tan.png',
-    headCentre: 0.448,
+    headCentre: 0.451,
+    headScale: 0.985,
   },
   {
     name: 'Kiu Yik Khong',
-    role: 'Co-Founder · Chief Operating Officer',
+    role: 'Chief Operating Officer',
     bio: 'Formerly business development at a Japanese M&A multinational and commercial lead in agriculture. Khong leads operations, business development and commercial execution, overseeing the deployment and scaling of every station.',
     image: '/images/founders/kiu-yik-khong.png',
-    headCentre: 0.463,
+    headCentre: 0.473,
+    headScale: 1.015,
   },
   {
     name: 'Alexchandar Anbalagan',
@@ -174,13 +196,15 @@ const LEADERSHIP: {
     bio: 'Over 20 years in strategy, finance, governance, enterprise risk and internal audit with Global Fashion Group, Rolls-Royce, DHL Supply Chain, Chubb and KPMG across Asia Pacific. FCCA, Certified Internal Auditor and an Oxford Executive Leadership alumnus.',
     image: '/images/founders/alexchandar-anbalagan.png',
     headCentre: 0.516,
+    headScale: 1.035,
   },
   {
     name: 'Ts. Mohammad Nazri Mizayauddin',
     role: 'Advisor · Governance & Sustainability',
     bio: 'Formerly Chief Strategy Officer at SEDA Malaysia, with over 25 years in corporate strategy, renewable energy, ESG and investment. Director of SUS Environment (Shanghai) and a national ExCo member of the IEA Photovoltaic Power Systems Programme.',
     image: '/images/founders/mohammad-nazri-mizayauddin.png',
-    headCentre: 0.518,
+    headCentre: 0.532,
+    headScale: 0.97,
   },
 ]
 
@@ -262,14 +286,6 @@ const RECORD: {
 ]
 
 export default function About() {
-  /**
-   * Which leadership panel is expanded. Starts at 0 rather than null so the row
-   * arrives already showing the pattern — a visitor can see it is a thing that
-   * opens without having to discover it with the pointer first, and the band
-   * never renders as four anonymous columns.
-   */
-  const [active, setActive] = useState(0)
-
   return (
     <>
       {/* ── band 1 · who Teask is · copy left, video bleeding in from the right ──
@@ -376,126 +392,84 @@ export default function About() {
               from slight at 1440 to enormous at 900. On an aspect the two scale
               together and the overlap holds steady at every width.
 
-              The row is an expanding accordion, the same move the Solutions
-              band makes: hovering a person grows their panel and squeezes the
-              other three. Driven by an active index rather than `group-hover`,
-              because a panel has to react to its SIBLINGS being hovered, which
-              CSS on the panel itself cannot see.
+              That aspect is also the dial for how much of a figure its caption
+              covers. The caption's height is set by its copy, so a taller row
+              does not grow it — it only grows the portrait underneath. Raising
+              the bio to a readable 14px pushed coverage to 49%; 26→29 brought
+              it back to 44 without touching the type.
 
-              Solutions animates flexGrow through framer-motion; this uses a
-              plain CSS transition on it instead. flex-grow is a number, so it
-              interpolates natively, and the eased curve here is Section's own
-              EASE written out — one less moving part than a motion component
-              for a value CSS can carry on its own.
+              Four equal panels, everything on show. There is no hover state:
+              no expanding panel, nothing held back behind a reveal, so no
+              active index and no interaction to discover. Each card carries its
+              own name, role and bio permanently.
 
-              flexGrow 2 against 1 is deliberately gentler than Solutions' 5:1.
-              The portrait is a fixed size — set by the row's height, not the
-              column's width — so widening a panel does not enlarge the figure,
-              it uncovers more of one that was already there. At 2:1 the open
-              panel comes out a touch wider than the figure, so the person is
-              revealed whole, while the closed three hold a centred crop. Push
-              it to 5:1 and the closed panels narrow to a sliver of lapel. */}
-          <div className="mt-16 hidden aspect-[49/26] xl:flex">
-            {LEADERSHIP.map((f, i) => {
-              const isOpen = active === i
+              That also settles the bio's width, which used to have to be pinned
+              in px so it would not re-wrap on every frame of a resize. Nothing
+              resizes now, so it simply sets to the column. */}
+          <div className="mt-16 hidden aspect-[49/29] xl:flex">
+            {LEADERSHIP.map((f) => {
+              const fig = figurePlacement(FIG_H, BLOCK_TOP, f.headScale)
               return (
-                /**
-                 * onFocus alongside onMouseEnter: tabbing through opens the same
-                 * panel a pointer would, so the bios stay reachable without one.
-                 */
-                <article
-                  key={f.name}
-                  tabIndex={0}
-                  onMouseEnter={() => setActive(i)}
-                  onFocus={() => setActive(i)}
-                  style={{ flexGrow: isOpen ? 2 : 1 }}
-                  className="relative h-full min-w-0 basis-0 cursor-pointer outline-none transition-[flex-grow] duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+              <article key={f.name} className="relative h-full min-w-0 flex-1">
+                <div
+                  className="absolute inset-x-0 top-[20%] bottom-0"
+                  style={{ clipPath: BLOCK_CLIP_FLUID, background: BLOCK_GRADIENT }}
+                  aria-hidden="true"
+                />
+                {/* The wrapper is the panel's width and carries the tuck; the
+                    portrait inside is sized off the row's HEIGHT, scaled so
+                    every head reads the same size. h-full of a wrapper that
+                    starts at fig.top is what pins the crop to the block's floor
+                    and the crown above its top edge. */}
+                <div
+                  className="absolute inset-x-0 bottom-0"
+                  style={{ top: fig.top, clipPath: fig.clip }}
+                >
+                  <img
+                    src={f.image}
+                    alt={`Portrait of ${f.name}, ${f.role}`}
+                    loading="lazy"
+                    style={{
+                      transform: `translateX(calc(-50% + ${headShift(f.headCentre)}% + ${LEAN_PX / 2}px))`,
+                    }}
+                    className="absolute bottom-0 left-1/2 h-full w-auto max-w-none object-contain object-bottom contrast-[1.08]"
+                  />
+                </div>
+
+                {/* Scrim + caption on a box with the SAME geometry as the block,
+                    so the two rakes line up. Clipping the caption's own short
+                    box instead makes the slant far steeper, because a polygon
+                    leans by a proportion of its box however tall it is. Padding
+                    is LEAN_PX plus a margin, in px for the same reason the clip
+                    is — it has to clear the rake, not a share of the column. */}
+                <div
+                  className="absolute inset-x-0 top-[20%] bottom-0 z-10"
+                  style={{ clipPath: BLOCK_CLIP_FLUID }}
                 >
                   <div
-                    className="absolute inset-x-0 top-[20%] bottom-0"
-                    style={{ clipPath: BLOCK_CLIP_FLUID, background: BLOCK_GRADIENT }}
-                    aria-hidden="true"
-                  />
-                  {/* The wrapper is the panel's width and carries the tuck; the
-                      portrait inside is sized off the row's HEIGHT, so it keeps
-                      one constant size while panels resize around it. h-full of
-                      a wrapper that starts at FIG_TOP is what pins the crop to
-                      the block's floor and the crown above its top edge. */}
-                  <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0"
-                    style={{ top: `${FIG_TOP}%`, clipPath: FIGURE_WRAP_CLIP }}
+                    className="absolute inset-x-0 bottom-0 flex flex-col items-start bg-gradient-to-t from-navy-950 from-30% via-navy-950/85 to-transparent pt-8 pb-7"
+                    style={{ paddingLeft: CAPTION_PAD, paddingRight: CAPTION_PAD }}
                   >
-                    <img
-                      src={f.image}
-                      alt={`Portrait of ${f.name}, ${f.role}`}
-                      loading="lazy"
-                      style={{
-                        transform: `translateX(calc(-50% + ${headShift(f.headCentre)}% + ${LEAN_PX / 2}px))`,
-                      }}
-                      className={`absolute bottom-0 left-1/2 h-full w-auto max-w-none object-contain object-bottom contrast-[1.08] transition-[filter] duration-500 ease-out ${
-                        isOpen ? 'grayscale-0' : 'grayscale'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Scrim + caption on a box with the SAME geometry as the
-                      block, so the two rakes line up. Clipping the caption's own
-                      short box instead makes the slant far steeper, because a
-                      polygon leans by a proportion of its box however tall it
-                      is. Padding is LEAN_PX plus a margin, in px for the same
-                      reason the clip is: it has to hold at any panel width. */}
-                  <div
-                    className="pointer-events-none absolute inset-x-0 top-[20%] bottom-0 z-10"
-                    style={{ clipPath: BLOCK_CLIP_FLUID }}
-                  >
-                    <div
-                      className="absolute inset-x-0 bottom-0 flex flex-col items-start bg-gradient-to-t from-navy-950 from-25% via-navy-950/80 to-transparent pt-8 pb-7 transition-opacity duration-500"
-                      style={{
-                        paddingLeft: CAPTION_PAD,
-                        paddingRight: CAPTION_PAD,
-                        opacity: isOpen ? 1 : 0.9,
-                      }}
-                    >
-                      <h3
-                        className="origin-left font-display leading-tight font-medium text-white transition-[font-size] duration-500 ease-out"
-                        style={{ fontSize: isOpen ? '1.5rem' : '1rem' }}
-                      >
-                        {f.name}
-                      </h3>
-                      {/* Role and bio share one collapse, so they open as a
-                          single move rather than two things crossfading.
-                          grid-template-rows 0fr→1fr rather than a max-height:
-                          max-height has to ease toward a guessed ceiling, so it
-                          runs fast then stalls once the content is fully shown,
-                          while 0fr→1fr eases to the content's own height and
-                          lands exactly on it. */}
-                      <div
-                        className="grid transition-[grid-template-rows,opacity] duration-500 ease-out"
-                        style={{
-                          gridTemplateRows: isOpen ? '1fr' : '0fr',
-                          opacity: isOpen ? 1 : 0,
-                          // Held back on the way open so the copy arrives as the
-                          // panel settles rather than racing it. No delay on the
-                          // way closed — it should be gone before the panel
-                          // narrows past it.
-                          transitionDelay: isOpen ? '140ms' : '0ms',
-                        }}
-                      >
-                        <div className="overflow-hidden">
-                          {/* fixed, so nothing re-wraps mid-animation */}
-                          <div style={{ width: BIO_WIDTH }}>
-                            <div className="mt-2 font-mono text-[10px] tracking-[0.18em] text-teal-brand uppercase">
-                              {f.role}
-                            </div>
-                            <p className="mt-2 text-[12px] leading-relaxed text-white/85">
-                              {f.bio}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                    {/* Two lines reserved. The caption is anchored to the floor,
+                        so anything that changes its height moves its TOP edge —
+                        and one name wrapping to a second line dropped that
+                        card's scrim 22px below its neighbours'. Reserving the
+                        pair levels the row. */}
+                    <h3 className="min-h-[2.8125rem] font-display text-lg leading-tight font-medium text-white">
+                      {f.name}
+                    </h3>
+                    <div className="mt-2 font-mono text-[11px] tracking-[0.16em] text-teal-brand uppercase">
+                      {f.role}
                     </div>
+                    {/* 14px. It was 12, which is a caption size, not a reading
+                        size, and this is a paragraph someone is meant to read.
+                        The looser 1.625 leading went with it — at 14px that
+                        bought height without buying legibility, and height here
+                        is portrait covered. 1.5 holds the measure comfortably. */}
+                    <p className="mt-2 text-[14px] leading-normal text-white/85">{f.bio}</p>
                   </div>
-                </article>
+                </div>
+              </article>
               )
             })}
           </div>
@@ -512,14 +486,16 @@ export default function About() {
               shorter, and a 40px gutter that suited the taller card leaves the
               two rows looking unmoored from each other */}
           <div className="mt-8 grid grid-cols-2 gap-x-1 gap-y-7 md:grid-cols-4 md:gap-y-10 xl:hidden">
-            {LEADERSHIP.map((f) => (
+            {LEADERSHIP.map((f) => {
+              const fig = figurePlacementGrid(f.headScale)
+              return (
               <article key={f.name} className="relative">
                 {/* Same rules as the desktop row — crop tucked into the block's
                     floor, crown clear of the top edge, face centred on the
-                    block — but sized to sit just inside the column rather than
-                    lapping over it: at two up the neighbour is close enough
-                    that an overflowing shoulder would run into the next
-                    portrait rather than over a block. */}
+                    block, heads levelled to one size — but sized to sit just
+                    inside the column rather than lapping over it: at two up the
+                    neighbour is close enough that an overflowing shoulder would
+                    run into the next portrait rather than over a block. */}
                 <div className="relative aspect-[4/5]">
                   {/* The rake runs at every width, phone included. It costs
                       nothing to keep: the lean is a proportion of the column
@@ -540,7 +516,7 @@ export default function About() {
                       itself would slide along with it */}
                   <div
                     className="absolute inset-x-0 bottom-0"
-                    style={{ top: `${FIG_TOP_GRID}%`, clipPath: FIGURE_WRAP_CLIP_GRID }}
+                    style={{ top: fig.top, clipPath: fig.clip }}
                   >
                     <img
                       src={f.image}
@@ -551,12 +527,7 @@ export default function About() {
                           headShift(f.headCentre) + RAKE_SHIFT_GRID
                         ).toFixed(2)}%))`,
                       }}
-                      // Colour on a phone, greyscale from md up. The greyscale
-                      // exists to stop four portraits shot under different
-                      // light from fighting each other across a row — at two up
-                      // on a phone they are never read as a row, so the reason
-                      // for draining them does not apply.
-                      className="absolute bottom-0 left-1/2 h-full w-auto max-w-none object-contain object-bottom contrast-[1.08] md:grayscale"
+                      className="absolute bottom-0 left-1/2 h-full w-auto max-w-none object-contain object-bottom contrast-[1.08]"
                     />
                   </div>
                 </div>
@@ -584,7 +555,8 @@ export default function About() {
                   </p>
                 </div>
               </article>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>
