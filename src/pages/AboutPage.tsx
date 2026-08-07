@@ -23,9 +23,13 @@ export default function AboutPage() {
         alternateName: 'Teask',
         url: SITE_URL,
         foundingDate: '2022',
+        // jobTitle carries the office only. That they founded the company is
+        // already what the `founder` property says, and repeating it here left
+        // the structured data contradicting the page once the visible copy
+        // dropped it.
         founder: [
-          { '@type': 'Person', name: 'James Anthony Tan', jobTitle: 'Co-Founder, Chief Executive Officer' },
-          { '@type': 'Person', name: 'Kiu Yik Khong', jobTitle: 'Co-Founder, Chief Operating Officer' },
+          { '@type': 'Person', name: 'James Anthony Tan', jobTitle: 'Chief Executive Officer' },
+          { '@type': 'Person', name: 'Kiu Yik Khong', jobTitle: 'Chief Operating Officer' },
         ],
         address: {
           '@type': 'PostalAddress',

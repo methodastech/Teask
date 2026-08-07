@@ -357,10 +357,14 @@ export default function About() {
         </div>
       </section>
 
-      <Story />
-      {/* ── band 4 · the founders (paper) ── */}
+      {/* ── band 2 · the leadership (paper) ──
+          Ahead of the story: who is behind this is the question a visitor
+          arrives with, and it now answers straight after the company itself.
+          Moving it here also fixes the band rhythm — the run used to go white,
+          white, paper, paper, white, which is exactly the alternation the file
+          is meant to keep. */}
       <section
-        className="relative w-full bg-paper pt-8 pb-24 md:pt-10 md:pb-32"
+        className="relative w-full bg-paper py-16 md:py-24"
         aria-label="Leadership"
       >
         <div className="shell">
@@ -560,6 +564,8 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      <Story />
 
       <Values />
 

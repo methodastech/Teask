@@ -14,20 +14,18 @@ import { EASE, SectionHeading } from './Section'
  * Both quotes are the founders' own published words from teask.asia, tidied
  * only for obvious typos and sentence punctuation. Nothing here is invented.
  */
-const QUOTES: { quote: string; name: string; role: string; image: string }[] = [
+const QUOTES: { quote: string; name: string; role: string }[] = [
   {
     quote:
       'I believe that the most valuable national resource is the potential of its people. Regardless of where you come from, you can make a difference. As a population, we must move forward. Malaysia is ready. The only question is whether we are.',
     name: 'James Anthony Tan',
-    role: 'Co-Founder, Chief Executive Officer',
-    image: '/images/founders/james-anthony-tan.png',
+    role: 'Chief Executive Officer',
   },
   {
     quote:
       'The way forward for our world is to adopt a new way of living. Sustainable, affordable and green are the three components that help us achieve that goal. We provide these services to society so that no one is left behind.',
     name: 'Kiu Yik Khong',
-    role: 'Co-Founder, Chief Operating Officer',
-    image: '/images/founders/kiu-yik-khong.png',
+    role: 'Chief Operating Officer',
   },
 ]
 
@@ -110,18 +108,12 @@ export default function Story() {
                 <blockquote className="text-sm leading-relaxed text-navy-950 md:text-base">
                   &ldquo;{q.quote}&rdquo;
                 </blockquote>
-                <figcaption className="mt-5 flex items-center gap-3">
-                  <img
-                    src={q.image}
-                    alt={q.name}
-                    loading="lazy"
-                    className="h-11 w-11 shrink-0 rounded-full object-cover"
-                  />
-                  <span>
-                    <span className="block text-sm font-bold text-navy-950">{q.name}</span>
-                    <span className="block font-mono text-[10px] tracking-[0.15em] text-gray-500 uppercase">
-                      {q.role}
-                    </span>
+                {/* No portrait here. The quote is the point, and the same four
+                    faces already carry the Leadership band directly above. */}
+                <figcaption className="mt-5">
+                  <span className="block text-sm font-bold text-navy-950">{q.name}</span>
+                  <span className="mt-0.5 block font-mono text-[10px] tracking-[0.15em] text-gray-500 uppercase">
+                    {q.role}
                   </span>
                 </figcaption>
               </motion.figure>
