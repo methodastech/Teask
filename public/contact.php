@@ -12,7 +12,7 @@ declare(strict_types=1);
  * It lives in `public/api/` so that Vite copies it verbatim into `dist/api/`.
  * That matters for the deploy: uploading the contents of dist/ to public_html
  * carries the endpoint with it, and the front end can therefore call it at the
- * relative path /api/contact.php with no CORS involved, because it is the same
+ * relative path /contact.php with no CORS involved, because it is the same
  * origin as the site.
  *
  * DELIVERABILITY, the part that actually bites:

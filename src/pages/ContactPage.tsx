@@ -21,11 +21,18 @@ const EMAIL = 'kiu@teask.asia'
 /**
  * Where the form posts.
  *
- * The endpoint ships WITH the site — public/api/contact.php becomes
- * dist/api/contact.php — so in a production build it is always at this relative
+ * The endpoint ships WITH the site — public/contact.php becomes
+ * dist/contact.php — so in a production build it is always at this relative
  * path, on the same origin, whatever domain the site is served from. That makes
  * it a fact about the app rather than configuration, so it lives here instead of
  * in an env file that `.gitignore` would drop on the next clone.
+ *
+ * At the site ROOT, deliberately not under /api/. The content API deploys into
+ * that folder and its .htaccess ends with `RewriteRule ^ index.php [QSA,L]`,
+ * routing everything inside /api/ to its own front controller — which has no
+ * contact route, so /api/contact.php would never execute. Keeping this one file
+ * out of that folder means the two can never collide, wherever the content API
+ * ends up living.
  *
  * Development deliberately gets nothing: the Vite dev server cannot execute PHP,
  * so posting there would only ever fail. Undefined sends the form down its
@@ -36,7 +43,7 @@ const EMAIL = 'kiu@teask.asia'
  */
 const CONTACT_ENDPOINT =
   (import.meta.env.VITE_CONTACT_ENDPOINT as string | undefined) ||
-  (import.meta.env.PROD ? '/api/contact.php' : undefined)
+  (import.meta.env.PROD ? '/contact.php' : undefined)
 
 /**
  * Why someone is writing. Asked up front because it changes what we need from

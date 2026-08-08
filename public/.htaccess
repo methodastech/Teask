@@ -1,32 +1,85 @@
-# Ships with the built site (Vite copies public/ into dist/).
+# Apache configuration for teask.asia
 #
-# React Router resolves /resources/<slug> in the browser, but Apache looks for
-# a folder of that name first and returns 404. This hands every non-file
-# request to index.html so the router can do its job — without it, opening an
-# article link directly, or refreshing on one, breaks.
+# Lives in public/ so Vite copies it to dist/.htaccess on every build. That is
+# the point: it is part of the deploy, not a thing to remember to recreate in
+# File Manager afterwards.
 
+Options -Indexes
+
+# ── client-side routing ──────────────────────────────────────────────────────
+#
+# The site is a single-page app: React Router reads the URL in the browser, and
+# /about, /solutions and /resources/<slug> exist only in JavaScript. There is no
+# `about` directory on disk, so a visitor RELOADING /about — or arriving from a
+# bookmark, a shared link or a Google result — asks Apache for a file that was
+# never there, and gets a 404. Clicking through from the homepage works, which
+# is what makes this look intermittent rather than broken.
+#
+# The fix is to serve index.html for anything that is not a real file, and let
+# the app resolve the path itself.
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # anything that exists on disk is served as-is
+  # Anything that exists on disk serves itself, untouched. This is the line that
+  # keeps /assets/*, /models/*, /videos/* and the PHP under /api/ working — the
+  # catch-all below would otherwise swallow every one of them.
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
+  # Everything else is a route, not a file.
   RewriteRule ^ index.html [L]
 </IfModule>
 
-# Vite puts a content hash in every filename under /assets, so those can be
-# cached forever — a new build produces new names. Files copied from public/
-# keep their names between builds and must not be, or replacing an image would
-# leave visitors on the old one.
-<IfModule mod_headers.c>
-  <IfModule mod_setenvif.c>
-    SetEnvIf Request_URI "^/assets/" IMMUTABLE_ASSET=1
-  </IfModule>
-  Header set Cache-Control "public, max-age=31536000, immutable" env=IMMUTABLE_ASSET
-  <FilesMatch "\.html$">
-    Header set Cache-Control "no-cache"
+# ── compression ──────────────────────────────────────────────────────────────
+#
+# Matched on extension rather than with AddOutputFilterByType, because the types
+# worth the most here are ones Apache has no MIME mapping for: the station is 41
+# STL files, and STL stores every triangle's three vertices in full with no index
+# buffer, so it is extremely repetitive and compresses by roughly two thirds.
+#
+# Deliberately NOT listed: webm, glb, jpg, png, webp. Those are already
+# compressed, and running deflate over them burns CPU on every request to save
+# nothing.
+<IfModule mod_deflate.c>
+  <FilesMatch "\.(html|css|js|mjs|json|svg|xml|txt|stl|hdr)$">
+    SetOutputFilter DEFLATE
   </FilesMatch>
+</IfModule>
+
+# ── caching ──────────────────────────────────────────────────────────────────
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+  # Thirty days, not a year, and no `immutable`. Vite fingerprints what it builds
+  # into /assets/, so those could be cached forever — but everything served from
+  # public/ (models, videos, images, fonts) keeps its plain name across builds,
+  # and a hard cache on those means replacing a photograph or a 3D part silently
+  # does nothing for anyone who has already visited.
+  ExpiresDefault "access plus 30 days"
+
+  # The app shell is the exception and must never be cached. It carries the
+  # fingerprinted script and stylesheet names, so a stale copy sends the browser
+  # after assets that the next deploy has already deleted — a blank page that
+  # only a manual hard refresh clears.
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# ── media types ──────────────────────────────────────────────────────────────
+# Apache ships no mapping for these, so they go out as octet-stream. The loaders
+# read them as array buffers and do not care, but a correct type lets the browser
+# and any CDN in front of it make sensible decisions.
+<IfModule mod_mime.c>
+  AddType model/gltf-binary            .glb
+  AddType model/stl                    .stl
+  AddType video/webm                   .webm
+  AddType image/vnd.radiance           .hdr
+  AddType font/woff2                   .woff2
 </IfModule>
