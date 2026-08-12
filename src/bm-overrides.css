@@ -1,0 +1,588 @@
+/* ── BM overrides · ported from the post-build layer (10 Aug 2026) ──────────
+   Lifted verbatim out of the deployed index.html, where it sat as two <style>
+   tags on top of the compiled bundle. It survives the move because it keys off
+   Tailwind class fragments and aria-labels, and Tailwind's class names are
+   literal in the output rather than hashed — [class*="text-hero"] matches the
+   same element in dev and in a build.
+
+   Imported from index.css, so it lands after Tailwind and keeps its cascade.
+   ------------------------------------------------------------------------ */
+
+/* ===== BM UI overrides, 10 Aug 2026 =====
+   Post-build layer: visual tuning on top of the compiled React bundle,
+   so the source chunks stay untouched for these cosmetic calls. */
+
+/* 1) Navigation — spur.us layout in white: flat technical bar, mono uppercase
+   links with square markers, blocky CTA. Hides on scroll down, returns on scroll up. */
+header.fixed{transition:transform .45s cubic-bezier(.22,.9,.3,1)}
+header.fixed.bm-nav-hidden{transform:translateY(-110%)}
+header.fixed nav{background:rgba(255,255,255,.88)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);
+  border-bottom:1px solid rgba(5,7,14,.06)}
+header.fixed nav a:not([aria-label="Teask home"]){
+  font-family:var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)!important;
+  font-size:11px!important;letter-spacing:.18em;text-transform:uppercase;font-weight:500}
+header.fixed nav a[class*="bg-"]{border-radius:0!important}
+/* over the hero banner: no bar at all — transparent, borderless; the white bar
+   fades in only once the page scrolls */
+header.fixed.bm-nav-top nav{background:transparent!important;border-bottom-color:transparent!important;
+  -webkit-backdrop-filter:none;backdrop-filter:none}
+/* a soft white scrim bleeding down from the top edge keeps the links readable
+   over foliage without ever reading as a bar */
+header.fixed.bm-nav-top::before{content:"";position:absolute;inset:-14px 0 auto 0;height:150px;
+  pointer-events:none;z-index:-1;
+  background:linear-gradient(to bottom,rgba(255,255,255,.92) 0%,rgba(255,255,255,.72) 42%,rgba(255,255,255,0) 100%)}
+/* dark ink with a white halo: legible over pale pavement AND green foliage */
+header.fixed.bm-nav-top nav a:not([class*="bg-"]){
+  color:#05070e!important;
+  text-shadow:0 0 10px rgba(255,255,255,.95),0 0 20px rgba(255,255,255,.8),0 1px 2px rgba(255,255,255,.9)}
+header.fixed.bm-nav-top nav a[aria-label="Teask home"] img{
+  filter:drop-shadow(0 0 10px rgba(255,255,255,.95)) drop-shadow(0 0 22px rgba(255,255,255,.75))}
+header.fixed nav{transition:background .35s,border-color .35s}
+header.fixed nav a[aria-label="Teask home"] img{height:45px!important;transform:translateY(3px)}
+header.fixed nav a[href*="log"]::before{content:"[\00a0\00a0"}
+header.fixed nav a[href*="log"]::after{content:"\00a0\00a0]"}
+
+/* 2) Hero title — larger */
+h1[class*="text-hero"]{font-size:clamp(3.6rem,7.3vw,7.6rem)!important;line-height:.95!important;letter-spacing:-.01em}
+
+/* 3) Hero meta bar — three true columns on the shell grid: the scroll rail sits
+   on the same left margin as the headline, the tagline is centred, the sun clock
+   stays right. The row is anchored to the bottom, so the tall rail grows upward
+   and its foot lands on the meta baseline. */
+#product div[class*="inset-x-0"][class*="bottom-6"] > .shell{
+  display:grid!important;grid-template-columns:1fr auto 1fr;align-items:end}
+/* tagline — centre column */
+#product div[class*="inset-x-0"][class*="bottom-6"] > .shell > div:first-child{
+  grid-area:1/2;justify-self:center}
+/* sun clock — right column */
+#product div[class*="inset-x-0"][class*="bottom-6"] > .shell > div:last-child{
+  grid-area:1/3;justify-self:end}
+/* "Hover the unit" instruction — not shown */
+#product div[class*="inset-x-0"][class*="bottom-6"] div:has(> svg[class*="mouse-pointer"]){
+  display:none!important}
+
+/* 3b) Scroll cue — premium vertical rail on the left */
+#product button[aria-label="Scroll on to the rest of the page"]{
+  grid-area:1/1;justify-self:start;align-self:end;
+  position:relative;height:auto;padding:0;
+  flex-direction:column;gap:12px;
+  border:0!important;background:transparent!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+#product button[aria-label="Scroll on to the rest of the page"] > span:first-child{display:none}
+#product button[aria-label="Scroll on to the rest of the page"] > span:last-child{
+  writing-mode:vertical-rl;letter-spacing:.38em;color:rgba(5,7,14,.55);transition:color .25s}
+#product button[aria-label="Scroll on to the rest of the page"]:hover > span:last-child{color:#0084d6}
+#product button[aria-label="Scroll on to the rest of the page"]::after{
+  content:"";width:1px;height:78px;
+  background:linear-gradient(to bottom,#0084d6,#3bb1e3) 0 -30px/1px 26px no-repeat,
+             linear-gradient(rgba(5,7,14,.15),rgba(5,7,14,.15)) 0 0/1px 100% no-repeat;
+  animation:bm-rail 2.4s cubic-bezier(.6,.05,.3,1) infinite}
+@keyframes bm-rail{to{background-position:0 108px,0 0}}
+
+/* 4) Partner strip — no separator dots, no rules, no ambient dust, no tick gauge;
+   logos ride a little lower in the band */
+section[class*="py-6"][class*="overflow-hidden"]{padding-top:4.6rem!important;padding-bottom:1.1rem!important}
+/* bigger logos, more air between them, slower drift */
+section[class*="py-6"] .marquee span[class*="mx-8"]{margin-left:2.9rem!important;margin-right:2.9rem!important}
+section[class*="py-6"] .marquee img{height:2.9rem!important}
+@media (min-width:768px){section[class*="py-6"] .marquee img{height:3.25rem!important}}
+section[class*="py-6"] .marquee{animation-duration:128s!important}
+
+/* 4b) Hero bottom fade — taller and eased, so white meets the 3D with no seam.
+   A two-stop linear ramp banded visibly; this curve is smooth end to end. */
+#product div[class*="bottom-0"][class*="bg-gradient-to-t"][class*="from-white"]{
+  height:13rem!important;
+  background:linear-gradient(to top,
+    rgb(255,255,255) 0%,
+    rgba(255,255,255,.97) 16%,
+    rgba(255,255,255,.87) 30%,
+    rgba(255,255,255,.71) 43%,
+    rgba(255,255,255,.51) 56%,
+    rgba(255,255,255,.31) 69%,
+    rgba(255,255,255,.15) 81%,
+    rgba(255,255,255,.05) 91%,
+    rgba(255,255,255,0) 100%)!important}
+/* the left scrim behind the headline: a narrow ellipse anchored off-canvas so
+   it is fully faded before it reaches the station — the copy sits on white,
+   the product stays untouched */
+@media (min-width:768px){
+  #product div[class*="inset-0"][class*="md:block"]{
+    background:radial-gradient(64% 128% at -10% 50%,
+      rgb(255,255,255) 0%,
+      rgba(255,255,255,.99) 34%,
+      rgba(255,255,255,.95) 50%,
+      rgba(255,255,255,.84) 62%,
+      rgba(255,255,255,.63) 72%,
+      rgba(255,255,255,.38) 81%,
+      rgba(255,255,255,.17) 89%,
+      rgba(255,255,255,.05) 95%,
+      rgba(255,255,255,0) 100%)!important}
+}
+/* 4c) Video thumbnail furniture — left scrim carrying the title block */
+.bm-vmeta{position:absolute;inset:0 auto 0 0;width:min(60%,660px);
+  display:flex;flex-direction:column;justify-content:flex-end;gap:16px;
+  padding:0 clamp(28px,5vw,72px) clamp(36px,5vw,68px);
+  pointer-events:none;z-index:4;
+  background:linear-gradient(to right,rgba(4,14,26,.9) 0%,rgba(4,14,26,.72) 45%,rgba(4,14,26,.3) 75%,rgba(4,14,26,0) 100%);
+  transition:opacity .45s ease}
+.bm-playing .bm-vmeta{opacity:0}
+.bm-vlabel{display:flex;align-items:center;gap:10px;
+  font-family:var(--font-mono,ui-monospace,monospace);font-size:11px;
+  letter-spacing:.32em;text-transform:uppercase;color:#5cc2ef}
+.bm-vlabel i{width:7px;height:7px;background:#5cc2ef;display:block;flex:none}
+.bm-vtitle{font-family:"TT Hooves","Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size:clamp(34px,4.4vw,64px);line-height:1.02;font-weight:500;color:#fff;letter-spacing:-.02em}
+.bm-vsub{font-size:15px;line-height:1.65;color:rgba(255,255,255,.76);max-width:42ch}
+.bm-vcta{display:inline-flex;align-items:center;gap:12px;margin-top:8px;align-self:flex-start;
+  padding:11px 20px;border:1px solid rgba(255,255,255,.32);border-radius:999px;
+  font-family:var(--font-mono,ui-monospace,monospace);font-size:11px;
+  letter-spacing:.2em;text-transform:uppercase;color:#fff;
+  background:rgba(255,255,255,.07);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.bm-vcta em{font-style:normal;letter-spacing:.14em;color:rgba(255,255,255,.55);
+  padding-left:12px;margin-left:2px;border-left:1px solid rgba(255,255,255,.22)}
+@media (max-width:767px){
+  /* On a ~190px-tall thumbnail the desktop furniture buries the frame: a 34px
+     title, an 80px play disc and a full-tile 40% scrim leave almost none of the
+     shot visible. Shrink all three so the still reads through. */
+  .bm-vmeta{width:100%;gap:8px;padding:0 18px 16px;
+    background:linear-gradient(to top,rgba(4,14,26,.88) 0%,rgba(4,14,26,.42) 46%,rgba(4,14,26,0) 78%)}
+  .bm-vsub{display:none}
+  .bm-vtitle{font-size:19px;line-height:1.12;letter-spacing:-.01em}
+  .bm-vlabel{font-size:9px;letter-spacing:.24em}
+  .bm-vcta{margin-top:2px;padding:7px 13px;font-size:9.5px;letter-spacing:.16em;gap:8px}
+  .bm-vcta em{padding-left:8px}
+  /* the play disc and its dimming veil, both from the bundle */
+  section[aria-label="Introduction video"] button span[class*="bg-navy-950/40"]{
+    background:rgba(4,14,26,.2)!important}
+  section[aria-label="Introduction video"] button span[class*="rounded-full"]{
+    height:48px!important;width:48px!important}
+  section[aria-label="Introduction video"] button span[class*="rounded-full"] svg{
+    height:18px!important;width:18px!important}
+}
+
+/* 4d) Solutions cards — every icon on one shared baseline, titles below it */
+#solutions div[class*="from-blue-deep"]{padding-bottom:clamp(20px,2.4vw,30px)!important}
+#solutions div[class*="from-blue-deep"] svg{margin-bottom:14px}
+#solutions div[class*="from-blue-deep"] h3{min-height:2.5em;align-items:flex-end}
+
+span[aria-hidden="true"][class*="rotate-45"]{display:none!important}
+section[class*="border-y"][class*="py-6"]{border-top:0!important;border-bottom:0!important}
+canvas[class*="fixed"][class*="z-30"]{display:none!important}
+
+/* 4e) Technology section — no container box around the detail panel, and the
+   3D visual sits at the TOP of it rather than buried under the copy */
+#technology div[class*="grid-cols-[minmax"] > *:last-child > div{
+  border:0!important;box-shadow:none!important;background:transparent!important}
+#technology div[class*="grid-cols-[minmax"] > *:last-child{
+  display:flex;flex-direction:column-reverse;justify-content:flex-end}
+#technology .bm-tech-stage{position:relative!important;left:auto!important;top:auto!important}
+
+/* 4f) Technology stepper — a calmer, more deliberate selected state */
+#technology button[class*="cursor-pointer"]{transition:opacity .3s,transform .3s}
+#technology button[class*="cursor-pointer"] div[class*="bg-blue"],
+#technology button[class*="cursor-pointer"] div[class*="bg-teal"]{
+  box-shadow:0 10px 26px -10px rgba(0,132,214,.55)!important;
+  transition:box-shadow .3s,background-color .3s}
+#technology button[class*="cursor-pointer"]:not(:hover) [class*="blur"]{opacity:.35}
+
+/* 4g) Technology flow — the tail of the rail is the diagram's payoff: amber
+   goes in at the top, brand blue comes out at the bottom. Rather than a lone
+   arrow dropping into empty space, the spine runs into a distribution bar that
+   forks and lands an arrowhead on each destination.
+   --spine is the gap from the chip row back to the rail axis: the block's
+   padding-left (60/76) less the rail offset (21/27). */
+#technology div[class*="pl-[60px]"]{--spine:39px;--chipH:46px}
+@media(min-width:64rem){#technology div[class*="pl-[60px]"]{--spine:49px}}
+#technology div[class*="pl-[60px]"] > span[class*="tracking-[0.24em]"]{
+  color:#0084d6!important}
+
+/* Each chip carries a 48-viewBox glyph drawn at 16px, which reads as a smudge.
+   Give it room — larger icon, more padding, label up a step so the chip still
+   reads as one unit. --chipH above must track the resulting height. */
+#technology div[class*="pl-[60px]"] div[class*="flex-wrap"] > span{
+  gap:10px;padding:11px 14px}
+#technology div[class*="pl-[60px]"] div[class*="flex-wrap"] > span > svg{
+  width:22px;height:22px;flex:none}
+#technology div[class*="pl-[60px]"] div[class*="flex-wrap"] > span > span:first-of-type{
+  font-size:14px}
+#technology div[class*="pl-[60px]"] div[class*="flex-wrap"] > span > span:last-of-type{
+  font-size:12.5px}
+
+/* 4h) The technology detail column doesn't need card chrome — the 3D scene and
+   the copy carry the step on their own. Bottom padding stays for the step bars. */
+#technology [class*="grid-cols-[minmax"] > div:nth-child(2){
+  border:0!important;background:transparent!important;box-shadow:none!important;
+  padding-top:0!important;padding-left:0!important;padding-right:0!important;
+  /* the card's tail padding is gone with its chrome; the stage's own margin
+     leaves the room the step indicator needs */
+  padding-bottom:0!important}
+
+/* 4i) Footer — the grey field is capped at 100rem, so past that it stops short
+   and leaves white gutters down both sides. Paint it full-bleed behind the two
+   blocks while their content stays on the same 100rem measure. isolation keeps
+   the -1 layer inside each block, above the footer's own white background. */
+footer div[class*="max-w-[100rem]"]{background-color:transparent!important;isolation:isolate}
+footer div[class*="max-w-[100rem]"]::before{
+  content:"";position:absolute;top:0;bottom:0;left:50%;width:100vw;
+  transform:translateX(-50%);background:#f3f5f8;z-index:-1;pointer-events:none}
+/* the second block is pushed down by mt-8; cover that gap so the field reads as one */
+footer div[class*="max-w-[100rem]"][class*="mt-8"]::before{top:-2rem}
+
+/* The fork assumes both chips share one row. They do below 64rem (single
+   column) and from 80rem up; between the two the section splits into two
+   columns and the row is too short, so the chips wrap — there the plain arrow
+   still reads. Measured with the larger chips: 540px needed, against 629
+   available at 768, 470 at 1024, 531 at 1152, 587 at 1280. */
+@media (min-width:48rem) and (max-width:63.99rem),(min-width:80rem){
+  /* one unbroken spine from step 04 down to the bar (chip height + the drop) */
+  #technology div[class*="pl-[60px]"] > span[class*="w-[2px]"]{
+    height:auto!important;bottom:calc(var(--chipH) + 16px);
+    background:linear-gradient(to bottom,rgba(5,7,14,.10),#0084d6)!important}
+  #technology div[class*="pl-[60px]"] > span[class*="border-t-[7px]"]{display:none!important}
+  /* the bar spans the destinations, so it hugs them rather than the column */
+  #technology div[class*="pl-[60px]"] > div[class*="flex-wrap"]{
+    position:relative;width:max-content;max-width:100%}
+  #technology div[class*="pl-[60px]"] > div[class*="flex-wrap"]::before{
+    content:"";position:absolute;left:calc(-1 * var(--spine));right:0;top:-16px;
+    height:2px;background:#0084d6}
+  /* a drop into each destination */
+  #technology div[class*="pl-[60px]"] > div[class*="flex-wrap"] > span{position:relative}
+  #technology div[class*="pl-[60px]"] > div[class*="flex-wrap"] > span::before{
+    content:"";position:absolute;left:calc(50% - 1px);top:-16px;width:2px;height:9px;
+    background:#0084d6}
+  #technology div[class*="pl-[60px]"] > div[class*="flex-wrap"] > span::after{
+    content:"";position:absolute;left:calc(50% - 6px);top:-9px;
+    border-left:6px solid transparent;border-right:6px solid transparent;
+    border-top:9px solid #0084d6;
+    filter:drop-shadow(0 2px 5px rgba(0,132,214,.35))}
+}
+
+/* 4f2) The closing CTA is its own section, not footer furniture: it keeps the
+   white page background and is separated by a rule from the info footer. */
+footer{background:#fff!important;border-top:0!important}
+footer > div:nth-child(1){
+  background:#fff;padding:clamp(72px,9vw,132px) 0 clamp(72px,9vw,124px);
+  border-bottom:1px solid rgba(5,7,14,.09)}
+/* one continuous footer slab — no white gap between the info row, the
+   watermark band and the legal bar */
+footer > div:nth-child(2){
+  background:#f3f5f8;margin-top:0!important;
+  padding-top:clamp(56px,6vw,86px)!important;padding-bottom:0!important}
+footer > div:nth-child(3){
+  background:#f3f5f8;margin-top:0!important;
+  padding-top:clamp(28px,3vw,44px)!important;padding-bottom:clamp(26px,3vw,40px)!important}
+
+@media (min-width:768px){
+  /* brand+address | nav columns | contact block */
+  footer > div:nth-child(2) > div{
+    display:grid!important;
+    grid-template-columns:1.35fr 1.15fr 1.5fr;
+    column-gap:clamp(28px,4vw,76px);
+    align-items:start!important}
+  /* the contact block, matched by its own classes — never by child index, so
+     the injected nav columns are not caught by these rules */
+  footer > div:nth-child(2) > div > div[class*="items-end"]{
+    display:block!important}
+  /* phone / email / whatsapp: three real columns */
+  footer > div:nth-child(2) > div > div[class*="items-end"] > div:first-child{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    column-gap:clamp(16px,2vw,44px);
+    align-items:start!important;gap:0!important}
+}
+footer > div:nth-child(2) [class*="flex-col"],
+footer > div:nth-child(2) [class*="items-end"]{
+  align-items:flex-start!important;text-align:left!important}
+footer > div:nth-child(2) [class*="items-end"]{align-items:flex-start!important}
+/* labels sit above their values with consistent rhythm */
+footer [class*="tracking-[0.2em]"]{display:block;margin-bottom:7px;color:rgba(5,7,14,.45)!important}
+/* social: flush right on its own row, no rings, no circles */
+footer div:has(> a[class*="rounded-full"]){
+  display:flex!important;flex-direction:row!important;gap:22px!important;
+  align-items:center!important;justify-content:flex-end!important;
+  margin-top:34px;padding-top:20px;border-top:1px solid rgba(5,7,14,.08)}
+footer a[class*="rounded-full"]{
+  border:0!important;border-radius:0!important;background:transparent!important;
+  width:auto!important;height:auto!important;padding:0!important}
+footer a[class*="rounded-full"] svg{width:19px;height:19px;color:rgba(5,7,14,.5);transition:color .2s}
+footer a[class*="rounded-full"]:hover svg{color:#0084d6}
+
+/* 5) Systems diagram — larger stage */
+@media (min-width:768px){
+  #grid div[class*="w-[66%]"]{width:88%!important;max-width:1180px}
+}
+
+/* 6) Card photos — center the subject vertically */
+img[class*="aspect-"][class*="object-cover"]{object-position:50% 68%}
+
+/* 7) No grey separation bands between sections */
+section[class*="bg-paper"]:not(#product){background-color:#fff!important}
+
+/* 8) Platform card photos — lift the subject to vertical center */
+#platform img[class*="object-cover"]{object-position:50% 68%}
+
+/* 9) Cursor states — default arrow stays; anything clickable gets the brand
+   ring-target (matches the reticle motif); the 3D orbit uses grab/grabbing (JS). */
+/* A cursor image is rasterised once at its own pixel size, then scaled by the
+   display — so a lone 22px SVG goes chunky on HiDPI and on Windows display
+   scaling. image-set() offers denser sources for the same 22px box, and the
+   plain url stays first as the fallback if image-set is unsupported. */
+:root{
+  --cursor-1x: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'><circle cx='11' cy='11' r='7.5' fill='none' stroke='%23ffffff' stroke-width='4'/><circle cx='11' cy='11' r='7.5' fill='none' stroke='%230084d6' stroke-width='2'/><circle cx='11' cy='11' r='2' fill='%230084d6'/></svg>") 11 11;
+  --cursor-action: image-set(
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'><circle cx='11' cy='11' r='7.5' fill='none' stroke='%23ffffff' stroke-width='4'/><circle cx='11' cy='11' r='7.5' fill='none' stroke='%230084d6' stroke-width='2'/><circle cx='11' cy='11' r='2' fill='%230084d6'/></svg>") 1x,
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 22 22'><circle cx='11' cy='11' r='7.5' fill='none' stroke='%23ffffff' stroke-width='4'/><circle cx='11' cy='11' r='7.5' fill='none' stroke='%230084d6' stroke-width='2'/><circle cx='11' cy='11' r='2' fill='%230084d6'/></svg>") 2x,
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='66' height='66' viewBox='0 0 22 22'><circle cx='11' cy='11' r='7.5' fill='none' stroke='%23ffffff' stroke-width='4'/><circle cx='11' cy='11' r='7.5' fill='none' stroke='%230084d6' stroke-width='2'/><circle cx='11' cy='11' r='2' fill='%230084d6'/></svg>") 3x) 11 11;
+  --cursor-arrow-brand: var(--cursor-action);
+}
+a,button,[role="button"],select,summary{cursor:var(--cursor-1x), pointer!important}
+a,button,[role="button"],select,summary{cursor:var(--cursor-action), pointer!important}
+
+/* 9b) Hero annotation badge — a 10%-opacity fill with a 40% ring disappears
+   against the pale concrete of the 3D scene. Make the disc solid brand blue
+   with a white glyph, so it holds over light and dark parts of the render the
+   same way the label beside it does with its text-shadow. */
+div[class*="w-56"] > span[class*="rounded-full"]{
+  background-color:#0084d6!important;
+  border-color:rgba(255,255,255,.6)!important;
+  color:#fff!important;
+  box-shadow:0 2px 10px rgba(5,7,14,.3),0 0 0 5px rgba(0,132,214,.14)}
+/* the glyph carries its own text-blue-brand class, which after the disc went
+   solid brand blue left it blue on blue — invisible. Force it white. */
+div[class*="w-56"] > span[class*="rounded-full"] svg{
+  stroke-width:1.9;color:#fff!important;stroke:#fff!important}
+
+/* 9c) #how — the pinned, scroll-scrubbed delivery sequence. The tall .bm-how-scroll
+   supplies the travel; .bm-how-sticky pins the scene and the step row together so
+   the steps can light up as their own beat plays. Mobile pins too, on a shorter
+   run and with its own 2x2 step grid (see 9h). */
+/* #how ships with overflow:hidden, which makes it the scrollport for anything
+   sticky inside it — the pin silently never engages. body already has
+   overflow-x:clip, so releasing it here costs nothing. */
+#how{overflow:visible!important}
+.bm-how-scroll{position:relative}
+/* no container: the renderer is alpha:true and the elevation sits straight on
+   the page, so the drawing reads as part of the layout rather than a boxed embed */
+.bm-how-stage{position:relative;width:100%;aspect-ratio:16/9;overflow:visible;
+  background:none;border:0}
+.bm-how-stage canvas{display:block;width:100%;height:100%}
+
+@media (min-width:768px){
+  /* one viewport of scroll per beat, plus a little lead-in and run-out */
+  .bm-how-scroll{height:440vh}
+  /* hug the heading rather than centring in the viewport — the dead band
+     between the section title and the scene was reading as a layout gap.
+     Height is auto for the same reason it is on mobile: at 100vh the scene and
+     step row leave ~340px of blank in the pin's lower half, and that blank
+     scrolls past as a gap before the next section. */
+  .bm-how-sticky{position:sticky;top:0;height:auto;display:flex;flex-direction:column;
+    justify-content:flex-start;padding-top:clamp(.25rem,1vh,.75rem);
+    padding-bottom:clamp(1rem,2.5vh,2rem);gap:clamp(1rem,2.5vh,2rem)}
+  /* On a wide viewport the stage box matched the render's own 16:9 and the
+     scene's blank sky came with it. Cap the box wider than the render and let
+     the canvas cover it, so the dead band above the horizon is cropped rather
+     than shown. Anchored low: everything that matters sits under the horizon. */
+  /* min-height:0 matters: as a column flex item its automatic minimum is the
+     canvas's own height, which outvoted the aspect-ratio and kept the box 16:9 */
+  .bm-how-stage{max-height:56vh;aspect-ratio:20/9;min-height:0;overflow:hidden}
+  .bm-how-stage canvas{object-fit:cover;object-position:50% 88%}
+  /* the step row lives inside the pin, so its own top margin has to go */
+  .bm-how-sticky > div[class*="md:block"]{margin-top:0!important}
+  /* inactive steps recede; the live one holds full contrast. Colours only —
+     opacity is owned by framer-motion's whileInView and must not be fought. */
+  #how .bm-hstep h3,#how .bm-hstep p,#how .bm-hstep .bm-sicon,
+  #how .bm-hstep [class*="font-mono"]{transition:color .4s ease,border-color .4s ease}
+  #how .bm-hstep:not(.bm-on) h3{color:rgba(5,7,14,.34)}
+  #how .bm-hstep:not(.bm-on) p{color:rgba(5,7,14,.26)}
+  #how .bm-hstep:not(.bm-on) [class*="font-mono"]{color:rgba(5,7,14,.28)}
+  #how .bm-hstep:not(.bm-on) .bm-sicon{color:rgba(5,7,14,.3)!important}
+  #how .bm-hstep:not(.bm-on) span[class*="rotate-45"]{border-color:rgba(5,7,14,.18)}
+  #how .bm-hstep:not(.bm-on) span[class*="rotate-45"] span{background:rgba(5,7,14,.12)}
+  #how .bm-hstep.bm-on .bm-sicon{color:#0084d6!important}
+}
+
+/* 9d) Lifespan card year counter — top-right, mono, brand blue number */
+.bm-years{position:absolute;top:14px;right:16px;text-align:right;pointer-events:none;
+  font-family:var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);
+  font-size:10px;letter-spacing:.22em;color:#8b98a6}
+.bm-years b{display:block;margin-top:2px;font-weight:600;font-size:22px;
+  letter-spacing:.04em;color:#0084d6;font-variant-numeric:tabular-nums}
+
+/* 9e) Stat cards on mobile — a 2x2 grid instead of a swipe rail. The carousel
+   showed one and a sliver of the next, so three of the four proof points were
+   invisible unless you happened to drag. :has() scopes this to the one rail
+   that carries these cards, leaving other horizontal scrollers alone. */
+@media (max-width:767px){
+  div[class*="snap-x"]:has(.bm-mini){
+    display:grid!important;grid-template-columns:1fr 1fr;gap:12px;
+    overflow-x:visible!important;scroll-snap-type:none!important;padding-bottom:0!important}
+  div[class*="snap-x"]:has(.bm-mini) > div{width:auto!important;scroll-snap-align:none!important}
+  /* half-width cards: the 36px stat would wrap mid-word at this measure */
+  div[class*="snap-x"]:has(.bm-mini) .bm-mini{height:132px!important}
+  div[class*="snap-x"]:has(.bm-mini) [class*="text-4xl"]{font-size:26px!important;line-height:1.1!important}
+  div[class*="snap-x"]:has(.bm-mini) h3{font-size:13px!important;line-height:1.3}
+  div[class*="snap-x"]:has(.bm-mini) p{font-size:10px!important;line-height:1.5;letter-spacing:.04em}
+  .bm-years{top:9px;right:10px;font-size:8px;letter-spacing:.18em}
+  .bm-years b{font-size:15px}
+
+  /* 9f) #how steps side by side rather than one tall column. Four across at
+     this width would leave ~105px a column and break the copy to six lines,
+     so they pair up instead — still horizontal, still all four on one screen.
+     The rail graphic goes: it only makes sense down a vertical list. */
+  #how div[class*="md:hidden"]:has(h3){
+    display:grid!important;grid-template-columns:1fr 1fr;gap:18px 14px;
+    margin-top:0!important}
+  #how div[class*="md:hidden"]:has(h3) > div[class*="absolute"]{display:none!important}
+  #how div[class*="md:hidden"]:has(h3) > div[class*="gap-5"]{gap:11px!important}
+  #how div[class*="md:hidden"]:has(h3) h3{font-size:17px!important}
+  #how div[class*="md:hidden"]:has(h3) p{font-size:12.5px!important;line-height:1.55}
+
+  /* 9h) The sequence runs on mobile too, rather than freezing on one frame.
+     Same pin, shorter run — four beats over 260vh instead of 440.
+
+     Height is auto, NOT 100svh. A viewport-tall pin whose content only comes to
+     ~600px carries ~356px of blank in its lower half, and that blank scrolls
+     past as a gap before the next section. Sizing to content removes it, keeps
+     the pin arithmetic (span = scroll - sticky) intact, and sidesteps the
+     address-bar resize jump that a vh/svh pin has on mobile. */
+  .bm-how-scroll{height:260vh}
+  .bm-how-sticky{position:sticky;top:0;height:auto;
+    display:flex;flex-direction:column;justify-content:flex-start;
+    padding-top:8px;padding-bottom:16px;gap:16px}
+  /* The section heading sits above the pinned block, so it used to scroll away
+     the instant the pin engaged. Stick it too and drop the scene below it — JS
+     sets .bm-how-sticky's top to this block's measured height. Opaque, because
+     the pin sits directly beneath it. */
+  #how .bm-how-head{position:sticky;top:0;z-index:2;
+    background:#fff;padding-top:10px;padding-bottom:10px}
+  .bm-how-stage{aspect-ratio:16/9;min-height:0;max-height:34svh}
+  /* the step grid is pinned alongside the scene, so its own top margin goes */
+  .bm-how-sticky > div[class*="md:hidden"]{margin-top:0!important}
+  /* inactive beats recede, the live one holds contrast — as on desktop */
+  #how .bm-hstep h3,#how .bm-hstep p,#how .bm-hstep [class*="font-mono"]{
+    transition:color .4s ease}
+  #how .bm-hstep:not(.bm-on) h3{color:rgba(5,7,14,.34)}
+  #how .bm-hstep:not(.bm-on) p{color:rgba(5,7,14,.26)}
+  #how .bm-hstep:not(.bm-on) [class*="font-mono"]{color:rgba(5,7,14,.28)}
+}
+
+/* 9g) Mobile menu — a popover hung off the burger, not a full-width drawer
+   dropping out of the bar. The panel keeps its own overflow:hidden so the
+   height animation still works, so the pointer cannot live on it; it is drawn
+   on the header instead and shown only while the button reads "Close menu". */
+@media (max-width:1023px){
+  header.fixed nav > div[class*="lg:hidden"][class*="backdrop-blur"]{
+    position:absolute!important;top:68px;right:12px;left:auto;
+    width:min(74vw,286px);
+    border:1px solid rgba(5,7,14,.10)!important;border-radius:14px;
+    background:rgba(255,255,255,.97)!important;
+    box-shadow:0 22px 48px -14px rgba(16,24,40,.30),0 2px 8px rgba(16,24,40,.06);
+    transform-origin:top right}
+  /* the popover is 286px, not the page width — drop the page gutter */
+  header.fixed nav > div[class*="lg:hidden"][class*="backdrop-blur"] .shell{
+    width:auto;max-width:none;padding-left:14px;padding-right:14px}
+  /* The bar's nav type is 11px mono at .18em tracking — right for a horizontal
+     strip, hard work as a stacked menu. Same family, bigger and tighter, full
+     ink, with taller rows so each is a comfortable tap target. */
+  header.fixed nav > div[class*="lg:hidden"][class*="backdrop-blur"] a{
+    font-size:14px!important;letter-spacing:.08em!important;font-weight:600!important;
+    color:#05070e!important;padding-top:9px;padding-bottom:9px}
+  header.fixed nav > div[class*="lg:hidden"][class*="backdrop-blur"] a[class*="bg-"]{
+    color:#fff!important;padding-top:13px;padding-bottom:13px}
+  header.fixed nav > div[class*="lg:hidden"][class*="backdrop-blur"] button{
+    font-size:14px!important;font-weight:600!important;color:#05070e!important}
+  /* the point, aimed at the burger's centre */
+  header.fixed:has(button[aria-label="Close menu"])::after{
+    content:"";position:absolute;top:62px;right:33px;width:13px;height:13px;
+    background:rgba(255,255,255,.97);
+    border-left:1px solid rgba(5,7,14,.10);border-top:1px solid rgba(5,7,14,.10);
+    border-radius:3px 0 0 0;transform:rotate(45deg);pointer-events:none}
+}
+
+/* 10) Walkthrough overlay legibility — dark ink over the light 3D scene */
+#product h2[class*="text-white"]{color:#05070e!important;text-shadow:0 2px 16px rgba(255,255,255,.6)!important}
+
+/* 11) No eyebrow kickers anywhere (keeps mono instruction chips) */
+span[class*="text-teal-brand"][class*="uppercase"]:not([class*="font-mono"]),
+p[class*="text-eyebrow"]{display:none!important}
+
+/* 12) Typography — balanced words per line, a touch more leading */
+p{text-wrap:balance;line-height:1.75}
+li{text-wrap:pretty}
+h2,h3,h4{text-wrap:balance}
+
+/* 12b) Grid cards — no divider line under the copy */
+#grid [class*="border-b"]{border-bottom:0!important}
+
+/* 13a) Solutions cards — softer blue wash, text still anchored */
+#solutions div[class*="from-blue-deep"]{
+  background:linear-gradient(to top,rgba(8,28,52,.92) 0%,rgba(8,28,52,.6) 34%,rgba(8,28,52,0) 66%)!important}
+
+/* 13b) Comparison — brand logo replaces the TEASK pill, row icons in ink */
+#comparison span[class*="rounded-full"][class*="bg-teal-brand"][class*="font-mono"]{
+  background:url(/brand/teask-logo-hd.png) left center/contain no-repeat!important;
+  width:86px;height:24px;padding:0;border-radius:0;font-size:0!important;color:transparent}
+#comparison span[class*="rounded-full"][class*="bg-teal-brand"][class*="font-mono"] *{display:none}
+#comparison svg[class*="text-blue-brand"]{color:#05070e!important}
+
+/* 13c) Headings — Palantir-style monochrome: second line 55% ink (hero keeps its blue) */
+section h2 span[class*="text-teal-brand"],
+section h2 span[class*="text-blue-brand"]{color:rgba(5,7,14,.55)!important}
+
+/* 13c2) Record stat cards — taller, with the 3D vignette seated inside the card.
+   Desktop only: the floor evens up a single row of four, but on the mobile 2x2
+   the cards' content stops near 298px and the rest reads as dead white. */
+@media (min-width:768px){
+  #record div[class*="border"][class*="bg-white"]{min-height:416px}
+}
+#record div[class*="text-4xl"]{padding-right:0}
+
+/* 13c3) Platform cards — small kicker sits above the title, left aligned */
+#platform div[class*="justify-between"]:has(> span[class*="uppercase"]){
+  flex-direction:column;align-items:flex-start;gap:10px}
+#platform div[class*="justify-between"]:has(> span[class*="uppercase"]) span[class*="uppercase"]{
+  order:2}
+
+/* 13g) Solutions — icons share one baseline; no blue lining anywhere; the
+   bottom shade is Teask blue, not black */
+#solutions div[class*="from-blue-deep"] h3{min-height:2.55em;display:flex;align-items:flex-end}
+#solutions [class*="border"]{border-color:rgba(5,7,14,.08)!important}
+#solutions img{border:0!important;outline:0!important}
+#solutions [class*="ring-"]{--tw-ring-color:transparent!important}
+#solutions div[class*="from-blue-deep"]{
+  background:linear-gradient(to top,rgba(0,74,128,.94) 0%,rgba(0,90,150,.55) 36%,rgba(0,90,150,0) 68%)!important}
+
+/* 13d) Footer — breathing room for the watermark, top-aligned info columns */
+/* one grey slab: the watermark band butts straight onto the info row, its old
+   top margin carried as padding so the breathing room survives the merge */
+footer > div:nth-child(3){margin-top:0!important;padding-top:6.5rem!important;padding-bottom:5.5rem}
+footer > div:nth-child(2),footer > div:nth-child(2) > div{align-items:flex-start!important}
+
+/* 13e) Systems diagram labels — premium cards, hoverable (hover wiring in bm-enhance) */
+#grid div[class*="inline-block"][class*="backdrop-blur-md"],
+#grid div[class*="inline-block"][class*="backdrop-blur-md"] *{pointer-events:auto!important}
+#grid div[class*="inline-block"][class*="backdrop-blur-md"]{
+  background:#fff!important;border:1px solid rgba(5,7,14,.1)!important;
+  border-radius:2px;
+  box-shadow:0 1px 2px rgba(5,7,14,.05),0 14px 34px -18px rgba(5,7,14,.22);
+  transition:transform .25s cubic-bezier(.22,.9,.3,1),box-shadow .25s,border-color .25s;
+  cursor:var(--cursor-1x), pointer;
+  cursor:var(--cursor-action), pointer}
+#grid div[class*="inline-block"][class*="backdrop-blur-md"]:hover{
+  transform:translateY(-2px);
+  box-shadow:0 2px 4px rgba(5,7,14,.06),0 22px 44px -18px rgba(59,177,227,.35);
+  border-color:rgba(0,132,214,.45)!important}
+
+/* premium motion layer — active only when JS runs (.mo-init), content visible by default */
+.mo-init [data-mo]{opacity:0;transform:translateY(22px);filter:blur(6px)}
+.mo-init [data-mo].mo-in{opacity:1;transform:none;filter:none;
+  transition:opacity .7s cubic-bezier(.22,.9,.3,1) var(--mo-d,0ms),transform .8s cubic-bezier(.22,.9,.3,1) var(--mo-d,0ms),filter .7s ease var(--mo-d,0ms)}
+.mo-init [data-mo-card]{transition:transform .35s cubic-bezier(.22,.9,.3,1),box-shadow .35s ease}
+.mo-init [data-mo-card]:hover{transform:translateY(-5px) scale(1.008);box-shadow:0 24px 48px -22px rgba(10,30,80,.28)}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){
+  .mo-init [data-mo]{opacity:1!important;transform:none!important;filter:none!important;transition:none!important}
+  .mo-init [data-mo-card],.mo-init [data-mo-card]:hover{transform:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}

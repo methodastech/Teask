@@ -213,9 +213,12 @@ const DEFAULT_ELEV = 0.42
  * there is nothing to disguise.
  */
 const ARRIVAL = {
-  elev: 1.2, // near top-down (MAX_ELEV is 1.35)
-  distMult: 3.4, // how far out the approach begins
-  seconds: 2.8,
+  elev: 1.5, // near top-down (MAX_ELEV is 1.35)
+  distMult: 4.2, // how far out the approach begins
+  // 4.2s, up from 2.8. The descent that hands over to this one now runs 7.2s and
+  // brakes into its own arrival; at 2.8 the handover was the fastest moment in a
+  // sequence that had spent seven seconds slowing down, and it read as a jump cut.
+  seconds: 4.2,
 }
 
 /**
@@ -1623,17 +1626,43 @@ export default function Station3Model({
           shader.vertexShader = shader.vertexShader
             .replace(
               '#include <common>',
-              '#include <common>\nvarying float vAxis;\nuniform float uHalfLen;',
+              '#include <common>\nvarying float vAxis;\nvarying float vInst;\nuniform float uHalfLen;',
             )
             .replace(
               '#include <begin_vertex>',
-              '#include <begin_vertex>\nvAxis = position.x / max(uHalfLen, 0.0001);',
+              '#include <begin_vertex>\nvAxis = position.x / max(uHalfLen, 0.0001);\nvInst = float(gl_InstanceID);',
             )
           shader.fragmentShader = shader.fragmentShader
-            .replace('#include <common>', '#include <common>\nvarying float vAxis;')
+            .replace(
+              '#include <common>',
+              '#include <common>\nvarying float vAxis;\nvarying float vInst;',
+            )
             .replace(
               '#include <map_fragment>',
               `#include <map_fragment>
+            /**
+             * Every other bike in brand blue.
+             *
+             * One shared texture across every instance means the only thing a
+             * fragment can key off to tell the bikes apart is its instance index,
+             * which is why this is gl_InstanceID and not a per-instance colour:
+             * instanceColor multiplies the whole map, so it would tint the tyres
+             * and the seat as well as the panels.
+             *
+             * A far wider catch than the mirror rule below — this wants the
+             * bodywork, which runs from deep red to a bright hot red, not just
+             * the near-pure red of the lamps. Keyed on red genuinely dominating
+             * both other channels rather than on green and blue being near zero.
+             * The luminance of the original is carried through so the panel keeps
+             * its own shading and does not go flat.
+             */
+            {
+              vec3 cb = diffuseColor.rgb;
+              if (mod(floor(vInst + 0.5), 2.0) < 0.5 && cb.r > 0.15 && cb.g > 0.06 && cb.b < 0.1 && cb.r > cb.b * 2.5 && cb.r > cb.g * 1.1) {
+                float bmLum = dot(cb, vec3(0.3, 0.6, 0.1));
+                diffuseColor.rgb = vec3(0.0, 0.235, 0.68) * (bmLum * 1.5 + 0.3);
+              }
+            }
             {
               vec3 c = diffuseColor.rgb;
               if (c.r > 0.05 && c.g < 0.015 && c.b < 0.015) {
@@ -1646,7 +1675,9 @@ export default function Station3Model({
             }`,
             )
         }
-        mat.customProgramCacheKey = () => 'bike-mirror-remap'
+        // the key has to change with the shader, or a cached program from the
+        // previous build gets reused and the blue never appears
+        mat.customProgramCacheKey = () => 'bike-mirror-remap-blue'
 
         const total = BIKES.perSide * 2
         const im = new InstancedMesh(geo, mat, total)
@@ -1928,19 +1959,40 @@ export default function Station3Model({
       // a panel lighting up under a pointer that happens to cross it reads as a
       // glitch, not an invitation.
       const hi = enteredRef.current ? pressedId ?? hoveredId : null
+      /**
+       * The pre-entry hint.
+       *
+       * Individual highlighting still waits for ENTER, for the reason above. But
+       * a hero that does nothing at all under the pointer gives no sign it can be
+       * explored, and ENTER on its own was being missed. So beforehand, hovering
+       * the unit ANYWHERE lifts every part together — a single object responding
+       * as one object, which reads as "this is interactive" without reading as
+       * "you have selected this panel".
+       */
+      const hint = !enteredRef.current && hoveredId ? 1 : 0
       parts.forEach((p, id) => {
         const on = id === hi
         // faces are always solid, so the unit reads as the real product from the
         // first frame (black cabinet, silver wings, dark PV)
-        p.faceMat.emissiveIntensity = p.glass ? 0.12 + (on ? 0.9 : 0) : on ? 0.5 : 0
-        ;(p.faceMat.emissive as Color).copy(on ? (p.glass ? emGlassOn : TEAL) : p.glass ? emGlassOff : black)
+        p.faceMat.emissiveIntensity = p.glass ? 0.12 + (on ? 0.9 : 0) : on ? 0.5 : hint * 0.08
+        ;(p.faceMat.emissive as Color).copy(
+          on
+            ? p.glass
+              ? emGlassOn
+              : TEAL
+            : hint && !p.glass
+              ? TEAL
+              : p.glass
+                ? emGlassOff
+                : black,
+        )
         // edges: panels fade out as they solidify; structure stays as blueprint.
         // 0.9 base, dark ink at half strength washed out on the white page.
         // Photoreal drops the ink entirely — a real object has no outline; only
         // the hovered part still gets a teal edge so selection stays readable.
-        const base = 0
+        const base = hint * 0.3
         p.edgeMat.opacity = on ? Math.max(base, 0.95) : base
-        ;(p.edgeMat.color as Color).copy(on ? TEAL : WHITE)
+        ;(p.edgeMat.color as Color).copy(on || hint ? TEAL : WHITE)
       })
     }
 
@@ -1986,8 +2038,10 @@ export default function Station3Model({
       if (id === hoveredId) return
       hoveredId = id
       if (!pressedId) onHoverChange(id)
-      // pointer cursor only once inside, in the intro the unit isn't clickable
-      mount.style.cursor = id && enteredRef.current ? CURSOR_ACTIVE : CURSOR_REST
+      // Over a part, the pointer cursor — the unit is now clickable before entry
+      // too, since clicking it is a way into Explore. Off the unit but inside,
+      // the open hand, which is the only affordance for drag-to-orbit there is.
+      mount.style.cursor = id ? CURSOR_ACTIVE : enteredRef.current ? 'grab' : CURSOR_REST
     }
     const setPressed = (id: string | null) => {
       if (id === pressedId) return
@@ -2059,7 +2113,7 @@ export default function Station3Model({
           dragging = true
 
           setPressed(null) // a drag cancels the click-and-hold zoom
-          mount.style.cursor = CURSOR_ACTIVE
+          mount.style.cursor = 'grabbing'
         }
         if (dragging) {
           // a thumb covers far less ground than a mouse, so it turns further per pixel
@@ -2076,7 +2130,7 @@ export default function Station3Model({
     const endDrag = () => {
       pointerDownActive = false
       dragging = false
-      mount.style.cursor = hoveredId && enteredRef.current ? CURSOR_ACTIVE : CURSOR_REST
+      mount.style.cursor = hoveredId ? CURSOR_ACTIVE : enteredRef.current ? 'grab' : CURSOR_REST
     }
     const onPointerLeave = () => {
       pointerInside = false
@@ -2084,7 +2138,21 @@ export default function Station3Model({
       // a legend selection survives the pointer leaving the canvas
       endDrag()
     }
+    /**
+     * Where a pre-ENTER press started, and whether it was pre-ENTER at all.
+     *
+     * Both are needed on the way back up: `enteredRef` may well have flipped in
+     * between (the ENTER button is live throughout), and acting on the state at
+     * release would then fire the request a second time against a unit that is
+     * already being explored.
+     */
+    let tapX = 0
+    let tapY = 0
+    let tapPreEnter = false
     const onPointerDown = (e: PointerEvent) => {
+      tapX = e.clientX
+      tapY = e.clientY
+      tapPreEnter = !enteredRef.current
       if (enteredRef.current) {
         pointerDownActive = true
         dragging = false
@@ -2095,9 +2163,22 @@ export default function Station3Model({
         // click-and-hold zoom is gone, inspection is driven by the part legend,
         // so pressing the model only ever starts a drag
       }
-      // intro: the unit itself is not clickable, ENTER is the only way in
     }
-    const onPointerUp = () => {
+    const onPointerUp = (e?: PointerEvent) => {
+      // Clicking the unit does what ENTER does — the model is the thing people
+      // actually point at, and a hero that lights up under the pointer and then
+      // ignores the click is worse than one that never responded at all. 6px of
+      // slop so a shaky click still counts, while a real drag does not.
+      if (
+        tapPreEnter &&
+        !enteredRef.current &&
+        hoveredId &&
+        e &&
+        Math.hypot(e.clientX - tapX, e.clientY - tapY) < 6
+      ) {
+        onEnterRequest?.()
+      }
+      tapPreEnter = false
       // selection is owned by the legend now, releasing the pointer keeps it
       endDrag()
     }
@@ -2182,7 +2263,14 @@ export default function Station3Model({
       // planting, which is what made the scene read as a turntable prop.
       // Rotating the object by θ and the camera by −θ give the same relative
       // view, so the drag feel is unchanged.
-      const dir = viewDir(AZ - (spinCurrent - INTRO_ANGLE), curElev)
+      // The arrival also swings ~50° round the site on its way down, unwinding on
+      // the same cubic as the descent. Dropping straight in on the final azimuth
+      // made the last leg pure elevation, which is the one camera move that has
+      // no parallax in it at all — the scene just scaled up. The swing gives the
+      // planting and the parked bikes something to move against, so the handover
+      // reads as flying in rather than as a zoom.
+      const swing = 0.9 * Math.pow(1 - Math.min(arrivalT, 1), 3)
+      const dir = viewDir(AZ - (spinCurrent - INTRO_ANGLE) + swing, curElev)
       camPos.copy(dir).multiplyScalar(curDist).add(curTarget)
       right.crossVectors(dir, UP).normalize()
       up.crossVectors(right, dir).normalize()
@@ -2363,7 +2451,7 @@ export default function Station3Model({
     const startLoop = () => {
       if (running) return
       running = true
-      curDist = defaultDist() * 1.32
+      curDist = defaultDist() * 1.7
       const beginArrival = () => {
         renderPaused = false
         arrivalDist = defaultDist() * ARRIVAL.distMult

@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* After Tailwind on purpose: this is an override layer and needs to win ties.
+   Both are @import rules, which CSS requires to precede everything else. */
+@import "./bm-overrides.css";
 
 /* TT Hooves (TypeType, licensed) — drop the files in /public/fonts and this
    picks them up. Falls back to Helvetica/Arial until they're present. */

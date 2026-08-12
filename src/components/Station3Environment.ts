@@ -453,6 +453,70 @@ export async function buildPhotorealEnvironment({
   // ── ground: grass campus + the parking lot ────────────────────────
   const grassGeo = track(new PlaneGeometry(420, 420))
   const grassMat = track(new MeshStandardMaterial({ color: 0xa9b992, roughness: 1, metalness: 0 }))
+  /**
+   * Turf, procedurally.
+   *
+   * A flat colour over 420 units is the one surface big enough that its
+   * flatness is unmissable — it reads as a green card the buildings are
+   * standing on. Mottling it at 46 repeats puts variation at roughly a
+   * two-metre wavelength, which is the scale real mown grass actually varies
+   * at, and the short strokes give the tiles a grain so the repeat does not
+   * announce itself as a grid.
+   *
+   * Its own PRNG, seeded independently, on purpose: this runs in the middle of
+   * the build and every placement after it draws from the scene's `rng`. Taking
+   * even one number from that stream here would shift every tree, building and
+   * parked car in the scene.
+   */
+  {
+    const cv = document.createElement('canvas')
+    cv.width = cv.height = 512
+    const ctx = cv.getContext('2d')!
+    ctx.fillStyle = '#8fa851'
+    ctx.fillRect(0, 0, 512, 512)
+    let s = 90210
+    const grnd = () => ((s = (s * 1664525 + 1013904223) >>> 0), s / 4294967296)
+    for (let i = 0; i < 260; i++) {
+      const px = grnd() * 512
+      const py = grnd() * 512
+      const pr = 18 + grnd() * 70
+      const pa = 0.05 + grnd() * 0.13
+      const tone = grnd()
+      const col = tone < 0.45 ? '122,140,66' : tone < 0.8 ? '156,178,88' : '140,158,72'
+      const g = ctx.createRadialGradient(px, py, 0, px, py, pr)
+      g.addColorStop(0, `rgba(${col},${pa})`)
+      g.addColorStop(1, `rgba(${col},0)`)
+      ctx.fillStyle = g
+      ctx.beginPath()
+      ctx.arc(px, py, pr, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    // blades: barely visible individually, but they are what stops the mottling
+    // from reading as smoke
+    ctx.strokeStyle = 'rgba(96,116,50,0.16)'
+    ctx.lineWidth = 1
+    for (let i = 0; i < 900; i++) {
+      const bx = grnd() * 512
+      const by = grnd() * 512
+      const bl = 2 + grnd() * 4
+      ctx.beginPath()
+      ctx.moveTo(bx, by)
+      ctx.lineTo(bx + (grnd() - 0.5) * 2, by - bl)
+      ctx.stroke()
+    }
+    const tex = track(new CanvasTexture(cv))
+    tex.wrapS = tex.wrapT = RepeatWrapping
+    tex.repeat.set(46, 46)
+    tex.colorSpace = SRGBColorSpace
+    grassMat.map = tex
+    // the tint now lives in the texture; leaving the old colour on would
+    // multiply through it and drag the whole campus olive
+    grassMat.color.setHex(0xffffff)
+    // noiseNormal already tracks what it returns
+    grassMat.normalMap = noiseNormal(1.0, 44)
+    grassMat.normalScale.set(0.5, 0.5)
+    grassMat.needsUpdate = true
+  }
   const grass = new Mesh(grassGeo, grassMat)
   grass.rotation.x = -Math.PI / 2
   grass.receiveShadow = true
@@ -530,7 +594,11 @@ export async function buildPhotorealEnvironment({
 
   // Access road looping outside the lot. Its inner edge sits just clear of the
   // lot's 21.6-unit diagonal; see the note on LOT_X for why that number governs.
-  const roadGeo = track(new RingGeometry(22.5, 26.5, 72))
+  // Widened from 22.5–26.5 to a full 14-unit carriageway, and up to 96 segments
+  // so the inner kerb reads as a curve rather than a polygon at the camera's
+  // closest approach. The extra width is what lets the ring read as a road the
+  // campus is built along instead of a painted track around it.
+  const roadGeo = track(new RingGeometry(20.5, 34.5, 96))
   const roadMat = track(new MeshStandardMaterial({ color: 0x9fa3a8, roughness: 0.92, metalness: 0 }))
   // the ring carries no markings of its own, so it takes the full scanned set
   if (REAL) applyPbr(roadMat, 'asphalt', 9)
@@ -538,7 +606,8 @@ export async function buildPhotorealEnvironment({
   road.rotation.x = -Math.PI / 2
   road.position.y = 0.01
   root.add(road)
-  const lineGeo = track(new RingGeometry(24.45, 24.55, 72))
+  // dead centre of the new carriageway (20.5 + 34.5) / 2
+  const lineGeo = track(new RingGeometry(27.42, 27.58, 96))
   const lineMat = track(new MeshStandardMaterial({ color: 0xf0efe9, roughness: 0.85, metalness: 0 }))
   const centreLine = new Mesh(lineGeo, lineMat)
   centreLine.rotation.x = -Math.PI / 2
@@ -563,21 +632,68 @@ export async function buildPhotorealEnvironment({
   // scheme and its sizes are already right, and a 3-subdivision icosahedron with
   // smooth normals reads as a real canopy at this distance. Faceting is the whole
   // maquette conceit, so it is exactly what has to go.
-  const canopyGeo = track(new IcosahedronGeometry(1, REAL ? 3 : 0))
+  // The faceting is gone from the planting in BOTH builds. It was the maquette
+  // conceit and it is what stopped the hero reading as a place — a two-subdivision
+  // crown with smooth normals costs almost nothing at this instance count and is
+  // the single change that moves the campus from game art to site model.
+  const canopyGeo = track(new IcosahedronGeometry(1, 2))
   const pineGeo = track(new ConeGeometry(1, 1, REAL ? 24 : 7))
-  const trunkGeo = track(new CylinderGeometry(0.13, 0.2, 1, REAL ? 16 : 6))
+  const trunkGeo = track(new CylinderGeometry(0.13, 0.2, 1, 10))
   const rockGeo = track(new IcosahedronGeometry(1, REAL ? 2 : 1))
   const boxGeo = track(new BoxGeometry(1, 1, 1))
 
-  const leafMat = track(
-    new MeshStandardMaterial({ roughness: REAL ? 0.82 : 0.9, metalness: 0, flatShading: !REAL }),
+  /**
+   * Car bodywork, by pushing the top face of a box around.
+   *
+   * Everything here is instanced, so the shapes have to be unit geometries that
+   * a per-instance matrix can scale — which rules out modelling a car and rules
+   * in deforming the one box every instance already shares. Narrowing the top
+   * face alone (`taper`) turns a rectangle into a greenhouse; adding z segments
+   * and giving each one its own height turns it into a bonnet, a roofline and a
+   * boot. It is three lines of vertex maths and it is the difference between a
+   * car park of crates and a car park of cars.
+   *
+   * `profile` is keyed off the vertex's own z, so the caller writes the
+   * silhouette front-to-back and does not have to know the segment count.
+   */
+  const shapeTop = (geo: BufferGeometry, taper: number, profile: (z: number) => number) => {
+    const pos = geo.attributes.position
+    for (let i = 0; i < pos.count; i++) {
+      if (pos.getY(i) <= 0) continue // the floor pan stays a rectangle
+      pos.setX(i, pos.getX(i) * taper)
+      pos.setY(i, profile(pos.getZ(i)))
+    }
+    geo.computeVertexNormals()
+    return geo
+  }
+
+  // a saloon's greenhouse: narrower than the body, and set back off the bonnet
+  const cabinGeo = track(
+    (() => {
+      const g = new BoxGeometry(1, 1, 1)
+      const pos = g.attributes.position
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getY(i) <= 0) continue
+        pos.setX(i, pos.getX(i) * 0.82)
+        pos.setZ(i, pos.getZ(i) * 0.72 - 0.06)
+      }
+      g.computeVertexNormals()
+      return g
+    })(),
   )
+  // the pickup: a raked screen, a flat cab roof and a bed dropped behind it
+  const truckCabinGeo = track(
+    shapeTop(new BoxGeometry(1, 1, 1, 1, 1, 4), 0.66, (z) =>
+      z > 0.45 ? -0.25 : z > 0.2 ? 0.29 : z < -0.45 ? 0.1 : z < -0.2 ? 0.29 : 0.5,
+    ),
+  )
+
+  const leafMat = track(new MeshStandardMaterial({ roughness: 0.85, metalness: 0 }))
   const trunkMat = track(
     new MeshStandardMaterial({
       color: 0x7d5a3c,
       roughness: 0.95,
       metalness: 0,
-      flatShading: !REAL,
       ...(concreteNormal ? { normalMap: concreteNormal, normalScale: new Vector2(0.7, 0.7) } : {}),
     }),
   )
@@ -627,12 +743,14 @@ export async function buildPhotorealEnvironment({
               // tree bends as one piece.
               float wy = max(iPos.y + position.y * sy, 0.0);
               float ph = iPos.x * 0.18 + iPos.z * 0.14;
-              float gust = sin(uWind * 1.05 + ph) * 0.62 + sin(uWind * 0.37 + ph * 1.9) * 0.38;
+              float gust = sin(uWind * 1.24 + ph) * 0.62 + sin(uWind * 0.37 + ph * 1.9) * 0.38;
               // >1 exponent: a cantilever bends little near the base and most at
               // the tip, and it pins the offset to zero at ground level so trunks
               // stay planted instead of sliding across the grass
               float bend = pow(clamp(wy / 6.0, 0.0, 1.6), 1.4);
-              transformed.xz += vec2(gust * 0.20 * bend, gust * 0.09 * bend) / sx;
+              // ~70% further than before: at the old amplitude the canopy read as
+              // still in a wide shot, which made the whole campus look frozen
+              transformed.xz += vec2(gust * 0.34 * bend, gust * 0.16 * bend) / sx;
             }
           #endif`,
         )
@@ -662,7 +780,10 @@ export async function buildPhotorealEnvironment({
   const plains: Placement[] = []
   const carBodies: Placement[] = []
   const carCabins: Placement[] = []
+  const truckCabins: Placement[] = []
   const wheels: Placement[] = []
+  /** where each parked car ended up, so the real model can be seated there later */
+  const parkedSpots: Array<{ x: number; z: number; r: number }> = []
 
   const push = (arr: Placement[], pos: Vector3, scale: Vector3, rotY: number, color: Color) => {
     dummy.position.copy(pos)
@@ -736,21 +857,56 @@ export async function buildPhotorealEnvironment({
     push(canopies, new Vector3(x, s * 0.5, z), new Vector3(s, s * (0.62 + rng() * 0.3), s), rng() * Math.PI, greenAt(0.35 + rng() * 0.6))
   }
 
-  /** a parked car: body, cabin, four wheels */
+  /**
+   * A parked car: body, cabin, four wheels.
+   *
+   * Roughly a third come out as the taller, longer pickup silhouette. A car park
+   * where every vehicle is the same box is the kind of detail nobody consciously
+   * notices and everybody reads as CG, and the two profiles are far enough apart
+   * in height and length to break the row up from any angle.
+   *
+   * Every spot is also recorded, because once the real vehicle model finishes
+   * loading these boxes are thrown away and a clone is seated at each of these
+   * positions instead — see the loader below.
+   */
   const CAR_COLORS = [0xf2f3f4, 0xe4e7ea, 0xd3d8dd, 0xb9c0c7, 0xf7f8f9, 0x9aa4ad, 0x8896a3]
   const car = (x: number, z: number, rotY: number) => {
-    const col = tmpColor.setHex(CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)]).clone()
-    push(carBodies, new Vector3(x, 0.52, z), new Vector3(1.9, 0.62, 4.3), rotY, col)
-    push(carCabins, new Vector3(x, 1.02, z), new Vector3(1.68, 0.56, 2.3), rotY, col)
-    const dx = 0.82
-    const dz = 1.45
+    parkedSpots.push({ x, z, r: rotY })
+    const truck = rng() < 0.32
+    const col = truck
+      ? tmpColor.setRGB(0.8, 0.82, 0.85).clone()
+      : tmpColor.setHex(CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)]).clone()
+    const s = Math.sin(rotY)
+    const c = Math.cos(rotY)
+    /** the bays run down the lot's z axis, so body parts are offset along local z */
+    const at = (ox: number, oz: number, y: number) =>
+      new Vector3(x + ox * c - oz * s, y, z + ox * s + oz * c)
+
+    let dx: number
+    let dz: number
+    if (truck) {
+      push(carBodies, at(0, 0, 0.62), new Vector3(2, 0.58, 5.2), rotY, col)
+      // in body colour, not glass: the cabin is the shape that says pickup
+      push(truckCabins, at(0, 0, 1.12), new Vector3(1.9, 0.62, 3.4), rotY, col)
+      dx = 0.92
+      dz = 1.75
+    } else {
+      push(carBodies, at(0, 0, 0.48), new Vector3(1.82, 0.52, 4.25), rotY, col)
+      // bonnet and boot: two shallow slabs either end, which is all it takes to
+      // stop the profile reading as a single extruded rectangle
+      push(carBodies, at(0, 1.52, 0.8), new Vector3(1.76, 0.2, 1.05), rotY, col)
+      push(carBodies, at(0, -1.62, 0.79), new Vector3(1.76, 0.18, 0.85), rotY, col)
+      push(carCabins, at(0, -0.15, 1.02), new Vector3(1.6, 0.55, 2.1), rotY, col)
+      dx = 0.82
+      dz = 1.45
+    }
+    const wheelY = truck ? 0.36 : 0.32
+    const wheelS = truck ? 0.38 : 0.32
     ;[[-dx, -dz], [dx, -dz], [-dx, dz], [dx, dz]].forEach(([ox, oz]) => {
-      const s = Math.sin(rotY)
-      const c = Math.cos(rotY)
       push(
         wheels,
-        new Vector3(x + ox * c - oz * s, 0.32, z + ox * s + oz * c),
-        new Vector3(0.32, 0.32, 0.32),
+        at(ox, oz, wheelY),
+        new Vector3(wheelS, wheelS, wheelS),
         rotY,
         tmpColor.setHex(0x1c1d20),
       )
@@ -786,7 +942,9 @@ export async function buildPhotorealEnvironment({
     } else {
       w = 8 + rng() * 4
       d = 8 + rng() * 4
-      h = 24 + rng() * 20
+      // 18–30, down from 24–44. The tallest blocks were crossing the headline
+      // and competing with the unit for the top of the frame.
+      h = 18 + rng() * 12
     }
     push(plains, new Vector3(x, h / 2, z), new Vector3(w, h, d), rotY, facade)
 
@@ -875,13 +1033,17 @@ export async function buildPhotorealEnvironment({
     const a = (i / PLOTS) * Math.PI * 2 + (rng() - 0.5) * 0.1
     // follows the road inward, so the campus still lines it rather than
     // floating off on its own
-    const rr = 31 + rng() * 24
+    // pushed out from 31–55 to 46–72: the road is 8 units wider now, and at the
+    // old radius the near buildings were standing on its outer edge
+    const rr = 46 + rng() * 26
     const x = Math.cos(a) * rr
     const z = Math.sin(a) * rr
     // keep the headline side lower and greener
     const headlineSide = x < -14 && rr < 52
 
-    if (!headlineSide && i % 2 === 0) {
+    // every sixth plot built rather than every second: at 50/50 the ring closed
+    // into a continuous wall of blocks that hid the skyline behind it
+    if (!headlineSide && i % 6 === 0) {
       const n = 1 + Math.floor(rng() * 2)
       for (let k = 0; k < n; k++) {
         const off = (k - (n - 1) / 2) * (15 + rng() * 6)
@@ -912,7 +1074,9 @@ export async function buildPhotorealEnvironment({
   }
 
   // 4 · skyline, hazing into the sky, with canopy between so it isn't a wall
-  for (let i = 0; i < 24; i++) {
+  // 10 towers, not 24: with the ring thinned out these are what the eye now
+  // reads as the far city, and 24 of them put a horizon of blocks behind the unit
+  for (let i = 0; i < 10; i++) {
     const a = rng() * Math.PI * 2
     const rr = 74 + rng() * 48
     building(Math.cos(a) * rr, Math.sin(a) * rr, rng() * Math.PI, 'tower')
@@ -971,38 +1135,74 @@ export async function buildPhotorealEnvironment({
   const traffic: Array<{ g: Group; a: number; speed: number; r: number }> = []
   const carSlots: Array<{ g: Group }> = []
   {
-    const bodyGeo = track(new BoxGeometry(1.9, 0.62, 4.3))
-    const cabinGeo = track(new BoxGeometry(1.68, 0.56, 2.3))
-    const tw = track(new CylinderGeometry(0.32, 0.32, 0.3, 8))
+    // This one is a real mesh rather than an instance, so unlike the parked cars
+    // it can afford a shaped body outright: bonnet, roofline and a dropped tail
+    // in one geometry.
+    const bodyGeo = track(
+      shapeTop(new BoxGeometry(2, 1.2, 5.2, 1, 1, 4), 0.66, (z) =>
+        z > 2.3 ? -0.3 : z > 1 ? 0.35 : z < -2.3 ? 0.12 : z < -1 ? 0.35 : 0.6,
+      ),
+    )
+    const roofGeo = track(new BoxGeometry(1.52, 0.34, 2.3))
+    const tw = track(new CylinderGeometry(0.36, 0.36, 0.34, 12))
     tw.rotateZ(Math.PI / 2)
     const g = new Group()
+    // A fixed near-mirror silver rather than one of the parked-car pastels. It is
+    // the only moving thing in the scene, so it is the only one that picks up a
+    // travelling highlight off the sky — which is what makes it read as moving
+    // from a distance where the actual displacement is a few pixels a second.
     const paint = track(
-      new MeshStandardMaterial({
-        color: CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)],
-        roughness: 0.45,
-        metalness: 0.25,
-        flatShading: true,
-      }),
+      new MeshStandardMaterial({ color: 0xc9ced4, roughness: 0.22, metalness: 0.75 }),
     )
     const body = new Mesh(bodyGeo, paint)
-    body.position.y = 0.52
+    body.position.y = 1.02
     body.castShadow = true
     g.add(body)
-    const cabin = new Mesh(cabinGeo, glassMat)
-    cabin.position.y = 1.02
+    const cabin = new Mesh(roofGeo, glassMat)
+    cabin.position.set(0, 1.36, 0.1)
     cabin.castShadow = true
     g.add(cabin)
-    ;[[-0.82, -1.45], [0.82, -1.45], [-0.82, 1.45], [0.82, 1.45]].forEach(([ox, oz]) => {
+    // Lamp bars. Emissive, so they hold their brightness on the shadowed side of
+    // the ring where the body itself goes dark and the car would otherwise
+    // disappear into the treeline for half of every lap.
+    const headMat = track(
+      new MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.9,
+        roughness: 0.2,
+        metalness: 0.1,
+      }),
+    )
+    const lampGeo = track(new BoxGeometry(1.16, 0.06, 0.05))
+    const head = new Mesh(lampGeo, headMat)
+    head.position.set(0, 0.92, 2.62)
+    g.add(head)
+    const tailMat = track(
+      new MeshStandardMaterial({
+        color: 0xff0033,
+        emissive: 0xcc0021,
+        emissiveIntensity: 0.8,
+        roughness: 0.2,
+        metalness: 0.1,
+      }),
+    )
+    const tail = new Mesh(lampGeo, tailMat)
+    tail.position.set(0, 1.14, -2.62)
+    g.add(tail)
+    ;[[-0.92, -1.75], [0.92, -1.75], [-0.92, 1.75], [0.92, 1.75]].forEach(([ox, oz]) => {
       const w = new Mesh(tw, tyreMat)
-      w.position.set(ox, 0.32, oz)
+      w.position.set(ox, 0.36, oz)
       g.add(w)
     })
     root.add(g)
     traffic.push({
       g,
       a: rng() * Math.PI * 2,
-      // an unhurried cruise: a lap of the ring takes a little under two minutes
-      speed: 0.055,
+      // a lap of the ring in a little over a minute. At 0.055 the car was slow
+      // enough that a viewer had to watch for several seconds to be sure it was
+      // moving at all, which defeats the point of having it.
+      speed: 0.09,
       r: LANE_R,
     })
     carSlots.push({ g })
@@ -1187,7 +1387,7 @@ export async function buildPhotorealEnvironment({
       const size = box.getSize(new Vector3())
       const centre = box.getCenter(new Vector3())
       const longest = Math.max(size.x, size.z) || 1
-      const scale = 4.6 / longest
+      const scale = 5.22 / longest
       carSlots.forEach((t) => {
         // Two wrappers: one scales the model and seats it on the road surface,
         // the one outside turns it. Splitting them keeps the turn from swinging
@@ -1209,24 +1409,60 @@ export async function buildPhotorealEnvironment({
         t.g.clear()
         t.g.add(holder)
       })
+
+      // The car park gets the real vehicle too, not just the one on the road.
+      // The lot is the closest ground to the camera and the boxes were legible
+      // as boxes there; one static clone per bay is cheap next to the 3.4M
+      // triangles of parked bikes already in the frame.
+      parkedSpots.forEach((spot) => {
+        const seat = new Group()
+        seat.add(proto.clone(true))
+        seat.scale.setScalar(scale)
+        seat.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale)
+        const holder = new Group()
+        holder.add(seat)
+        holder.position.set(spot.x, 0, spot.z)
+        holder.rotation.y = spot.r + (size.x > size.z ? -Math.PI / 2 : 0)
+        root.add(holder)
+      })
+      // and the placeholders they replace never get built — this runs before the
+      // instanced draws are assembled, and an empty list makes no InstancedMesh
+      carBodies.length = 0
+      carCabins.length = 0
+      truckCabins.length = 0
+      wheels.length = 0
     }
 
     // FBX first (the supplied Cybertruck), then glTF, so either format works.
-    new FBXLoader().load(
-      `${MODELS_BASE}/cybertruck.fbx`,
-      (fbx) => adopt(fbx),
-      undefined,
-      () => {
-        new GLTFLoader().load(
-          `${MODELS_BASE}/car.glb`,
-          (gltf) => adopt(gltf.scene),
-          undefined,
-          () => {
-            /* no vehicle model present: the placeholder cars stay */
-          },
-        )
-      },
-    )
+    //
+    // Awaited, where it used to be fire-and-forget. `adopt` now empties the
+    // parked-car placement lists, and that only means anything if it happens
+    // before the instanced draws are assembled below — otherwise the boxes get
+    // built anyway and the real vehicles are seated on top of them. Every path
+    // out of here resolves, including both failures, so a missing model delays
+    // the build by one failed request rather than hanging it.
+    await new Promise<void>((done) => {
+      new FBXLoader().load(
+        `${MODELS_BASE}/cybertruck.fbx`,
+        (fbx) => {
+          adopt(fbx)
+          done()
+        },
+        undefined,
+        () => {
+          new GLTFLoader().load(
+            `${MODELS_BASE}/car.glb`,
+            (gltf) => {
+              adopt(gltf.scene)
+              done()
+            },
+            undefined,
+            // no vehicle model present: the placeholder cars stay
+            () => done(),
+          )
+        },
+      )
+    })
   }
 
   const updateTraffic = (dt: number) => {
@@ -1267,7 +1503,8 @@ export async function buildPhotorealEnvironment({
     mkInstanced(rockGeo, rockMat, rocks),
     mkInstanced(boxGeo, plainMat, plains),
     mkInstanced(boxGeo, carMat, carBodies),
-    mkInstanced(boxGeo, glassMat, carCabins),
+    mkInstanced(cabinGeo, glassMat, carCabins),
+    mkInstanced(truckCabinGeo, carMat, truckCabins),
     mkInstanced(wheelGeo, tyreMat, wheels),
     mkInstanced(boxGeo, bandMat, bands),
     mkInstanced(boxGeo, pvMat, pvs),
