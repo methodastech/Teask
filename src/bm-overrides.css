@@ -62,22 +62,34 @@ h1[class*="text-hero"]{font-size:clamp(3.6rem,7.3vw,7.6rem)!important;line-heigh
 #product div[class*="inset-x-0"][class*="bottom-6"] div:has(> svg[class*="mouse-pointer"]){
   display:none!important}
 
-/* 3b) Scroll cue — premium vertical rail on the left */
+/* 3b) Scroll cue — premium vertical rail on the left.
+
+   Height-gated. The rail is ~215px of vertical type plus an animated line,
+   growing UP from the meta baseline — and the copy column it shares the left
+   gutter with is vertically centred, so its ENTER button reaches down toward
+   that same corner. The two need about 1160px of viewport before they both
+   fit; on anything shorter (which is every common laptop) the rail climbed
+   straight through the button. Below the gate the override stands down and the
+   button keeps its own compact pill form, which lives INSIDE the meta bar's
+   row and therefore cannot collide with anything. */
 #product button[aria-label="Scroll on to the rest of the page"]{
-  grid-area:1/1;justify-self:start;align-self:end;
-  position:relative;height:auto;padding:0;
-  flex-direction:column;gap:12px;
-  border:0!important;background:transparent!important;
-  -webkit-backdrop-filter:none!important;backdrop-filter:none!important}
-#product button[aria-label="Scroll on to the rest of the page"] > span:first-child{display:none}
-#product button[aria-label="Scroll on to the rest of the page"] > span:last-child{
-  writing-mode:vertical-rl;letter-spacing:.38em;color:rgba(5,7,14,.55);transition:color .25s}
-#product button[aria-label="Scroll on to the rest of the page"]:hover > span:last-child{color:#0084d6}
-#product button[aria-label="Scroll on to the rest of the page"]::after{
-  content:"";width:1px;height:78px;
-  background:linear-gradient(to bottom,#0084d6,#3bb1e3) 0 -30px/1px 26px no-repeat,
-             linear-gradient(rgba(5,7,14,.15),rgba(5,7,14,.15)) 0 0/1px 100% no-repeat;
-  animation:bm-rail 2.4s cubic-bezier(.6,.05,.3,1) infinite}
+  grid-area:1/1;justify-self:start;align-self:end}
+@media (min-height:1160px){
+  #product button[aria-label="Scroll on to the rest of the page"]{
+    position:relative;height:auto;padding:0;
+    flex-direction:column;gap:12px;
+    border:0!important;background:transparent!important;
+    -webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  #product button[aria-label="Scroll on to the rest of the page"] > span:first-child{display:none}
+  #product button[aria-label="Scroll on to the rest of the page"] > span:last-child{
+    writing-mode:vertical-rl;letter-spacing:.38em;color:rgba(5,7,14,.55);transition:color .25s}
+  #product button[aria-label="Scroll on to the rest of the page"]:hover > span:last-child{color:#0084d6}
+  #product button[aria-label="Scroll on to the rest of the page"]::after{
+    content:"";width:1px;height:78px;
+    background:linear-gradient(to bottom,#0084d6,#3bb1e3) 0 -30px/1px 26px no-repeat,
+               linear-gradient(rgba(5,7,14,.15),rgba(5,7,14,.15)) 0 0/1px 100% no-repeat;
+    animation:bm-rail 2.4s cubic-bezier(.6,.05,.3,1) infinite}
+}
 @keyframes bm-rail{to{background-position:0 108px,0 0}}
 
 /* 4) Partner strip — no separator dots, no rules, no ambient dust, no tick gauge;
