@@ -372,13 +372,18 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
 
     let renderer: WebGLRenderer
     try {
-      renderer = new WebGLRenderer({ antialias: false, alpha: true })
+      renderer = new WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance' })
     } catch {
       // no WebGL: hand over rather than showing a dead canvas
       doneRef.current()
       return
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    /* Capped at 1.5, not 2: everything here is soft-focus cloud and glow, so the
+       extra resolution bought nothing visible — but the scene is pure fill (a
+       sky dome, three full-screen transparent decks, ~200 billboards), and fill
+       is exactly what makes integrated GPUs drop frames. */
+    let dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+    renderer.setPixelRatio(dpr)
     // the scattering shader outputs real radiance, so it needs a film curve —
     // clamping it to sRGB directly blows the sun and the horizon to flat white
     renderer.toneMapping = ACESFilmicToneMapping
@@ -592,11 +597,19 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
      * covered in the first 78% of the time; the rest is the approach.
      */
     const BRAKE_AT = 0.78
-    const BRAKE_DIST = 0.86
-    const ease = (t: number) =>
-      t < BRAKE_AT
-        ? Math.pow(t / BRAKE_AT, 2) * BRAKE_DIST
-        : BRAKE_DIST + (1 - BRAKE_DIST) * (1 - Math.pow(1 - (t - BRAKE_AT) / (1 - BRAKE_AT), 2))
+    /* 0.84, not the old 0.86: the brake is now a Hermite segment that takes over
+       at the EXACT speed the acceleration hands it, and 0.84 is the most
+       distance that entry speed can be absorbed over while the cubic stays
+       monotone. The old pair of quadratics shed 42% of the camera's speed in a
+       single frame at the joint — a visible jerk right where the dive begins. */
+    const BRAKE_DIST = 0.84
+    const ease = (t: number) => {
+      if (t < BRAKE_AT) return Math.pow(t / BRAKE_AT, 2) * BRAKE_DIST
+      const u = (t - BRAKE_AT) / (1 - BRAKE_AT)
+      // entry slope carried across the joint, in the brake segment's own time
+      const v = ((2 * BRAKE_DIST) / BRAKE_AT) * (1 - BRAKE_AT)
+      return BRAKE_DIST + (1 - BRAKE_DIST) * (3 - 2 * u) * u * u + v * u * (1 - u) * (1 - u)
+    }
 
     /**
      * Pitch: hold near the horizon through the cruise so the sunrise stays in
@@ -614,17 +627,50 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
       [1.0, -0.6], // nose down, into the last deck
     ]
     const smooth = (x: number) => x * x * (3 - 2 * x)
+    /* One continuous nose-over: a C¹ cubic through the knots, with tangents
+       averaged from the neighbouring secants and zeroed at the ends (ease in,
+       settle out). Interpolating each segment with its own smoothstep meant the
+       pitch RATE fell to zero at every interior knot — the camera visibly
+       nodded, paused, and nodded again on the way down. The knot data is
+       monotone with near-equal secants, so the averaged tangents cannot
+       overshoot. */
+    const secant = (a: number, b: number) => (PITCH[b][1] - PITCH[a][1]) / (PITCH[b][0] - PITCH[a][0])
+    const P_M = PITCH.map((_, i) =>
+      i === 0 || i === PITCH.length - 1 ? 0 : (secant(i - 1, i) + secant(i, i + 1)) / 2,
+    )
     const pitchAt = (t: number) => {
       for (let i = 0; i < PITCH.length - 1; i++) {
         const [t0, p0] = PITCH[i]
         const [t1, p1] = PITCH[i + 1]
-        if (t <= t1) return p0 + (p1 - p0) * smooth((t - t0) / (t1 - t0))
+        if (t <= t1 || i === PITCH.length - 2) {
+          const h = t1 - t0
+          const u = Math.min(1, Math.max(0, (t - t0) / h))
+          const u2 = u * u
+          const u3 = u2 * u
+          return (
+            (2 * u3 - 3 * u2 + 1) * p0 +
+            (u3 - 2 * u2 + u) * h * P_M[i] +
+            (3 * u2 - 2 * u3) * p1 +
+            (u3 - u2) * h * P_M[i + 1]
+          )
+        }
       }
       return PITCH[PITCH.length - 1][1]
     }
 
+    /* Pay the sky shader's compile and every texture upload BEFORE the clock
+       starts. Left to the first animated frame, they cost a triple-digit-ms
+       stall with `start` already ticking — the fall opened by visibly jumping
+       over its own first moments. */
+    camera.position.set(0, Y_START, 0)
+    camera.rotation.set(pitchAt(0), 0, 0)
+    renderer.render(scene, camera)
+
     let raf = 0
     let start = 0
+    let last = 0
+    let frameAvg = 0
+    let dropAt = 0
     let finished = false
     const finish = () => {
       if (finished) return
@@ -634,6 +680,22 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
 
     const frame = (now: number) => {
       if (!start) start = now
+      /* If the machine still can't hold the frame rate, shed resolution rather
+         than smoothness — the eye forgives softer clouds far more readily than
+         a stuttering fall. A long gap is a backgrounded tab, not load: reset
+         the average instead of reacting to it. */
+      const dt = now - last
+      if (last && dt < 250) {
+        frameAvg = frameAvg ? frameAvg * 0.9 + dt * 0.1 : dt
+        if (frameAvg > 26 && dpr > 0.8 && now - dropAt > 700) {
+          dpr = Math.max(0.8, dpr - 0.35)
+          renderer.setPixelRatio(dpr)
+          resize()
+          frameAvg = 0
+          dropAt = now
+        }
+      } else frameAvg = 0
+      last = now
       const t = Math.min(1, (now - start) / DURATION)
       const y = Y_START + (Y_END - Y_START) * ease(t)
 
@@ -658,8 +720,10 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
       streak.scale.set(swell, swell * 0.8, 1)
       streak.material.opacity = 0.07 + 0.18 * smooth(t)
 
+      // set from elapsed time, not incremented per frame: the old += drifted
+      // twice as fast on a 120Hz display and slowed down under every frame drop
       decks.forEach((cl, n) => {
-        cl.rotation.z += 0.00016 * (n + 1)
+        cl.rotation.z = n * 1.7 + (now - start) * 0.0000096 * (n + 1)
       })
       puffs.forEach((p) => p.quaternion.copy(camera.quaternion))
 

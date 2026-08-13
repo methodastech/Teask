@@ -2273,10 +2273,10 @@ function mountRecordIntro() {
 }
 
 function mountPoster() {
-  /* scope to the Watch section: #how now injects its own videos ABOVE this one
-     in document order, and a bare querySelector("video") would dress those */
-  const v = document.querySelector('section[aria-label="Introduction video"] video')
-    || document.querySelector("video:not([data-bm-how])");
+  /* scope to the Watch section only: other pages carry their own videos (the
+     About hero's decorative background loop, #how's injected clips), and any
+     wider selector ends up dressing those with this section's film furniture */
+  const v = document.querySelector('section[aria-label="Introduction video"] video');
   if (!v) return false;
   if (v.dataset.bmPoster) return true;
   v.poster = "/images/solutions/on-the-move.webp";
