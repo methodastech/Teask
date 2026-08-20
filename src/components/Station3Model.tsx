@@ -1928,21 +1928,54 @@ export default function Station3Model({
       resize()
 
       /**
-       * Compile every shader in the scene BEFORE reporting ready.
+       * Compile every shader in the scene BEFORE reporting ready — but in
+       * slices, not in one go.
        *
        * Compilation is a synchronous stall inside the graphics driver, and three
        * does it lazily — the first time a material is actually drawn. Left alone
        * that means the whole scene's shaders compile during the first rendered
        * frame, which is precisely the frame the intro hands over on. All the care
        * taken over the descent and the fade is spent, and then the reveal opens
-       * on a locked-up tab.
+       * on a locked-up tab. So it moves here, into the window where a full-screen
+       * animation is already covering for us.
        *
-       * `compileAsync` moves it earlier, into the window where a full-screen
-       * animation is already covering for us. Where the driver supports
-       * KHR_parallel_shader_compile it also gets to do the work off-thread; where
-       * it does not, this is still a stall — just a stall nobody can see.
+       * The catch is that "covering for us" was wishful: the descent is a live
+       * animation on the same thread and the same GPU. Compiling the whole scene
+       * in one call handed the driver every program at once and blocked for
+       * 2.5-3 seconds straight — under a profile that was 43% of the entire
+       * intro, and the descent is driven off the wall clock, so it did not slow
+       * down, it JUMPED. The thing meant to hide the stall was the thing being
+       * wrecked by it.
+       *
+       * Same total work, handed over a few objects at a time with a frame in
+       * between. The slice grows while batches come back cheap (a shared
+       * material is a cache hit and costs nothing) and halves as soon as one
+       * actually stalls, so it converges on roughly a frame's worth of work per
+       * step instead of guessing at a fixed count.
+       *
+       * `batch.children` is assigned rather than `add`ed to on purpose: three
+       * only ever reads `children` when it walks the graph for materials, and
+       * reparenting the real scene objects to compile them would be a genuinely
+       * destructive way to ask a question.
        */
-      await renderer.compileAsync(scene, camera)
+      const drawables: Object3D[] = []
+      scene.traverse((o) => {
+        const d = o as Mesh
+        if (d.isMesh || (o as unknown as { isLine?: boolean }).isLine) drawables.push(o)
+      })
+      const batch = new Object3D()
+      let slice = 4
+      for (let i = 0; i < drawables.length; ) {
+        if (disposed) return
+        const t0 = performance.now()
+        batch.children = drawables.slice(i, i + slice)
+        await renderer.compileAsync(batch, camera, scene)
+        const cost = performance.now() - t0
+        i += slice
+        slice = cost > 12 ? Math.max(1, slice >> 1) : Math.min(64, slice * 2)
+        if (i < drawables.length) await breathe()
+      }
+      batch.children = []
       if (disposed) return
 
       onReady?.()
@@ -2452,16 +2485,32 @@ export default function Station3Model({
       if (running) return
       running = true
       curDist = defaultDist() * 1.7
-      const beginArrival = () => {
-        renderPaused = false
+      /**
+       * Posing and drawing are two different things, and conflating them meant
+       * the pause above never once took effect.
+       *
+       * The hold exists for exactly one case — the intro is running — and the
+       * line below that sets the overhead camera fires in exactly that case
+       * too. When both lived in `beginArrival`, arranging the camera also
+       * released the render loop, so the heavier of the two scenes drew every
+       * frame, post-processing and all, underneath an opaque overlay for the
+       * whole seven-second descent. It was the single largest thing competing
+       * with the animation it was supposed to be hiding behind.
+       */
+      const poseOverhead = () => {
         arrivalDist = defaultDist() * ARRIVAL.distMult
         curDist = arrivalDist
         curElev = ARRIVAL.elev
         arrivalT = 0
       }
+      const beginArrival = () => {
+        poseOverhead()
+        renderPaused = false
+      }
       // hold overhead from the first frame if the intro is running, so there is
-      // never a moment of settled hero visible behind the white
-      if (arriveFromAbove) beginArrival()
+      // never a moment of settled hero visible behind the white — the pose only,
+      // the parent releases the drawing when it hands over
+      if (arriveFromAbove) poseOverhead()
       if (arriveRef) arriveRef.current = beginArrival
 
       raf = requestAnimationFrame(loop)

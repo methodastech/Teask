@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useScroll } from 'framer-motion'
 import { ArrowRight, ChevronDown, ChevronLeft, MousePointerClick, X } from 'lucide-react'
 import { PART_GROUPS } from '../lib/station3Parts'
 import type { HeroStyle } from '../lib/heroStyle'
+import { setViewportCovered } from '../lib/overlay'
 import SolarDay from './SolarDay'
 import ProductCallouts from './ProductCallouts'
 import { chamferClip } from './ChamferBorder'
@@ -115,6 +116,18 @@ export default function Station3Experience() {
   useEffect(() => {
     if (flightDone && ready) arriveRef.current?.()
   }, [flightDone, ready])
+
+  /**
+   * While the descent is up it owns the screen outright, so tell the rest of
+   * the page to stand down — the ambient dust canvas in particular, which is
+   * repainting the full viewport underneath it for nothing. Released the moment
+   * the overlay starts lifting, not when it finishes, so the dust is already
+   * running by the time any of it shows through.
+   */
+  useEffect(() => {
+    setViewportCovered(!flightDone)
+    return () => setViewportCovered(false)
+  }, [flightDone])
 
   useEffect(() => {
     if (flightDone) return

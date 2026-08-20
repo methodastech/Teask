@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { OVERLAY_EVENT } from '../lib/overlay'
 
 interface Particle {
   x: number
@@ -116,12 +117,38 @@ export default function AmbientParticles() {
       raf = requestAnimationFrame(loop)
     }
 
+    /**
+     * Held while something opaque is covering the viewport — in practice the
+     * hero's opening descent, which paints over the whole screen for seven
+     * seconds.
+     *
+     * Not a micro-optimisation: this is a full-viewport 2D canvas clearing and
+     * compositing ~180 arcs per frame on the main thread, and during the
+     * descent not one of those pixels can be seen. It was competing for frames
+     * with the animation hiding it.
+     */
+    let covered = false
+
     const start = () => {
       cancelAnimationFrame(raf)
+      raf = 0
       resize()
       // paint immediately, rAF may not fire for a while (hidden/background tab)
       drawFrame(0)
-      if (!reducedMotion.matches) {
+      if (!reducedMotion.matches && !covered) {
+        last = performance.now()
+        raf = requestAnimationFrame(loop)
+      }
+    }
+
+    const onOverlay = (e: Event) => {
+      const next = !!(e as CustomEvent<boolean>).detail
+      if (next === covered) return
+      covered = next
+      cancelAnimationFrame(raf)
+      raf = 0
+      if (!covered && !reducedMotion.matches) {
+        // resume from now, so the held seconds do not arrive as one jump
         last = performance.now()
         raf = requestAnimationFrame(loop)
       }
@@ -135,12 +162,14 @@ export default function AmbientParticles() {
     start()
     window.addEventListener('resize', start)
     window.addEventListener('pointermove', onPointerMove, { passive: true })
+    window.addEventListener(OVERLAY_EVENT, onOverlay)
     reducedMotion.addEventListener('change', start)
 
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', start)
       window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener(OVERLAY_EVENT, onOverlay)
       reducedMotion.removeEventListener('change', start)
     }
   }, [])

@@ -6,6 +6,9 @@ import {
   CanvasTexture,
   Color,
   DoubleSide,
+  InstancedBufferAttribute,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
@@ -218,18 +221,35 @@ function cloudTexture(seed: number) {
   const G = 64
   const grid = new Float32Array(G * G)
   for (let i = 0; i < grid.length; i++) grid[i] = rnd()
+  const sm = (t: number) => t * t * (3 - 2 * t)
+  /**
+   * `%` in JavaScript keeps the sign of its left operand, and one of the two
+   * warp fields is sampled from x = -5.2 — so `Math.floor(x) % G` handed back
+   * negative lattice columns. Wherever the row index also landed on a multiple
+   * of G, the pair indexed BEFORE the start of the array: `grid[-6]` is
+   * `undefined`, the arithmetic yields NaN, and the pixel silently fell out of
+   * the cloud as a hole.
+   *
+   * The cost was the larger half of it. A Float32Array read that returns
+   * `undefined` drops off V8's fast path and poisons the load site for every
+   * subsequent call — this one function was 7% of the page's entire main-thread
+   * time, at roughly a microsecond a call for what is a dozen flops. Wrapping
+   * into range fixes the holes and puts the loop back on the fast path.
+   */
+  const wrap = (n: number) => ((n % G) + G) % G
   const val = (x: number, y: number) => {
-    const xi = Math.floor(x) % G
-    const yi = Math.floor(y) % G
-    const xf = x - Math.floor(x)
-    const yf = y - Math.floor(y)
-    const sm = (t: number) => t * t * (3 - 2 * t)
-    const u = sm(xf)
-    const v = sm(yf)
+    const fx = Math.floor(x)
+    const fy = Math.floor(y)
+    const xi = wrap(fx)
+    const yi = wrap(fy)
+    const xi1 = xi + 1 === G ? 0 : xi + 1
+    const yi1 = yi + 1 === G ? 0 : yi + 1
+    const u = sm(x - fx)
+    const v = sm(y - fy)
     const a = grid[yi * G + xi]
-    const b = grid[yi * G + ((xi + 1) % G)]
-    const c = grid[((yi + 1) % G) * G + xi]
-    const dd = grid[((yi + 1) % G) * G + ((xi + 1) % G)]
+    const b = grid[yi * G + xi1]
+    const c = grid[yi1 * G + xi]
+    const dd = grid[yi1 * G + xi1]
     return a + (b - a) * u + (c - a) * v + (a - b - c + dd) * u * v
   }
   const fbm = (x: number, y: number) => {
@@ -244,19 +264,57 @@ function cloudTexture(seed: number) {
     return f
   }
 
+  /**
+   * The two domain-warp fields, on a coarse grid.
+   *
+   * They are broad by construction — they displace the sample point, so detail
+   * in them finer than the displacement itself cannot reach the result. Running
+   * them per-pixel put two thirds of this build into fields that are smooth
+   * across several pixels. Sampled at 96² and bilinearly interpolated instead:
+   * the same fields, the same clouds, in well under half the time.
+   *
+   * Worth caring about because of WHEN it runs — three times, synchronously,
+   * on the frame the descent is mounted. Every millisecond here is a millisecond
+   * the page is locked before the fall has started.
+   */
+  const WG = 96
+  const warpX = new Float32Array(WG * WG)
+  const warpY = new Float32Array(WG * WG)
+  const uMax = ((N - 1) / N) * 5.5
+  for (let j = 0; j < WG; j++)
+    for (let i = 0; i < WG; i++) {
+      const u = (i / (WG - 1)) * uMax
+      const v = (j / (WG - 1)) * uMax
+      warpX[j * WG + i] = fbm(u + 11.7, v + 3.1) // so the noise is not grid-aligned
+      warpY[j * WG + i] = fbm(u - 5.2, v + 9.4)
+    }
+  const warpAt = (f: Float32Array, gx: number, gy: number) => {
+    const i = Math.min(WG - 2, gx | 0)
+    const j = Math.min(WG - 2, gy | 0)
+    const fx = gx - i
+    const fy = gy - j
+    const a = f[j * WG + i]
+    const b = f[j * WG + i + 1]
+    const c = f[(j + 1) * WG + i]
+    const dd = f[(j + 1) * WG + i + 1]
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + dd) * fx * fy
+  }
+
   const img = ctx.createImageData(N, N)
   const d = img.data
   const den = new Float32Array(N * N)
-  for (let y = 0; y < N; y++)
+  for (let y = 0; y < N; y++) {
+    const gy = (y / (N - 1)) * (WG - 1)
     for (let x = 0; x < N; x++) {
       const u = (x / N) * 5.5
       const v = (y / N) * 5.5
-      const wx = fbm(u + 11.7, v + 3.1) // domain warp, so the noise is not grid-aligned
-      const wy = fbm(u - 5.2, v + 9.4)
+      const wx = warpAt(warpX, (x / (N - 1)) * (WG - 1), gy)
+      const wy = warpAt(warpY, (x / (N - 1)) * (WG - 1), gy)
       let f = fbm(u + wx * 1.9, v + wy * 1.9)
       f = Math.max(0, f - 0.535) / 0.465 // coverage threshold
       den[y * N + x] = Math.pow(f, 1.35)
     }
+  }
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
       const i = y * N + x
@@ -542,38 +600,112 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
      * stack of decals.
      */
     const puffMaps = [track(puffTexture(11)), track(puffTexture(313)), track(puffTexture(9241))]
-    const puffs: Mesh[] = []
+    /**
+     * Batched, one InstancedMesh per puff texture.
+     *
+     * These ~200 puffs were ~200 Meshes, each with its own geometry and its own
+     * material, so every single frame paid 200 world-matrix rebuilds, 200
+     * frustum tests, a depth sort across the lot and 200 draw calls — all of it
+     * to draw one quad two hundred times. Three batches now carry the same
+     * scene, and the billboarding moved into the vertex shader below, so the
+     * instance matrices upload once and are never touched again.
+     *
+     * Instances draw in buffer order rather than being sorted per frame, so
+     * each batch is pre-sorted back-to-front here. The camera only ever travels
+     * in y and the puffs never move, so that order holds for the whole descent
+     * — and it is steadier than a per-frame sort, which reorders neighbours as
+     * they pass each other and pops.
+     */
+    const puffBatches: InstancedMesh[] = []
     {
       let ps = 424242 >>> 0
       const prnd = () => ((ps = (ps * 1664525 + 1013904223) >>> 0), ps / 4294967296)
+      type Puff = { map: number; x: number; y: number; z: number; w: number; h: number; a: number; c: Color }
+      const spec: Puff[] = []
+      // the draw ORDER out of prnd is the cloud layout — every value below is
+      // pulled in exactly the sequence the per-mesh version used, so batching
+      // rearranges nothing
       DECKS.forEach((cy, li) => {
         for (let n = 0; n < 66; n++) {
-          const mat = track(
-            new MeshBasicMaterial({
-              map: puffMaps[(li + n) % 3],
-              transparent: true,
-              depthWrite: false,
-              opacity: 0.4 + prnd() * 0.42,
-            }),
-          )
+          const a = 0.4 + prnd() * 0.42
           const warm = prnd()
-          mat.color = new Color().setRGB(
-            0.86 + warm * 0.14,
-            0.84 + warm * 0.1,
-            0.84 - warm * 0.04,
-          )
-          const p = new Mesh(track(new PlaneGeometry(1, 1)), mat)
           const side = prnd() < 0.5 ? -1 : 1
-          p.position.set(
-            side * (40 + prnd() * 1150),
-            cy - 30 + prnd() * 96,
-            -(150 + prnd() * 1600),
-          )
+          const x = side * (40 + prnd() * 1150)
+          const y = cy - 30 + prnd() * 96
+          const z = -(150 + prnd() * 1600)
           const w = 95 + prnd() * 520
-          p.scale.set(w, w * (0.42 + prnd() * 0.34), 1)
-          scene.add(p)
-          puffs.push(p)
+          const h = w * (0.42 + prnd() * 0.34)
+          spec.push({
+            map: (li + n) % 3,
+            x,
+            y,
+            z,
+            w,
+            h,
+            a,
+            c: new Color().setRGB(0.86 + warm * 0.14, 0.84 + warm * 0.1, 0.84 - warm * 0.04),
+          })
         }
+      })
+
+      const m4 = new Matrix4()
+      puffMaps.forEach((map, mi) => {
+        const list = spec.filter((s) => s.map === mi).sort((a, b) => a.z - b.z)
+        const mat = track(
+          new MeshBasicMaterial({ map, transparent: true, depthWrite: false }),
+        )
+        /**
+         * Per-instance alpha, and camera-facing without touching the CPU.
+         *
+         * MeshBasicMaterial is patched rather than replaced by a ShaderMaterial
+         * so the map decode, the film curve and the output transform stay
+         * exactly the ones the rest of the scene is using — a hand-written
+         * shader here would have to reproduce all three to match, and any drift
+         * would show as these puffs alone sitting at the wrong exposure.
+         */
+        mat.onBeforeCompile = (shader) => {
+          shader.vertexShader = shader.vertexShader
+            .replace(
+              '#include <common>',
+              '#include <common>\nattribute float aPuffAlpha;\nvarying float vPuffAlpha;',
+            )
+            /* The instance matrix carries a position and a size, no rotation.
+               Spreading the quad across the view plane here is precisely what
+               `quaternion.copy(camera.quaternion)` did per puff per frame, and
+               it costs nothing: the camera's own rotation is already baked into
+               modelViewMatrix. */
+            .replace(
+              '#include <project_vertex>',
+              `vPuffAlpha = aPuffAlpha;
+  vec4 mvPosition = modelViewMatrix * vec4( instanceMatrix[ 3 ].xyz, 1.0 );
+  mvPosition.xy += transformed.xy * vec2( length( instanceMatrix[ 0 ].xyz ), length( instanceMatrix[ 1 ].xyz ) );
+  gl_Position = projectionMatrix * mvPosition;`,
+            )
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nvarying float vPuffAlpha;')
+            .replace(
+              '#include <alphamap_fragment>',
+              '#include <alphamap_fragment>\n  diffuseColor.a *= vPuffAlpha;',
+            )
+        }
+
+        // one geometry per batch, not per puff: the instanced alpha attribute
+        // lives on the geometry, so the three batches cannot share a single one
+        const geo = track(new PlaneGeometry(1, 1))
+        const alphas = new Float32Array(list.length)
+        const im = new InstancedMesh(geo, mat, list.length)
+        list.forEach((s, i) => {
+          m4.makeScale(s.w, s.h, 1)
+          m4.setPosition(s.x, s.y, s.z)
+          im.setMatrixAt(i, m4)
+          im.setColorAt(i, s.c)
+          alphas[i] = s.a
+        })
+        geo.setAttribute('aPuffAlpha', new InstancedBufferAttribute(alphas, 1))
+        im.instanceMatrix.needsUpdate = true
+        if (im.instanceColor) im.instanceColor.needsUpdate = true
+        scene.add(im)
+        puffBatches.push(im)
       })
     }
 
@@ -672,6 +804,19 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
     let frameAvg = 0
     let dropAt = 0
     let finished = false
+    /* Last value written to each animated style, so a frame that would restate
+       what is already there writes nothing. Worth the bookkeeping only for the
+       properties that cost a repaint to change — `filter` above all, which
+       re-rasterises a blur and two wide shadows over a 520px mark every time
+       the string differs. */
+    let lastFilter = ''
+    let lastStars = ''
+    let lastFade = ''
+    const setStyle = (el: HTMLElement, prop: 'opacity' | 'filter', v: string, prev: string) => {
+      if (v === prev) return prev
+      el.style.setProperty(prop, v)
+      return v
+    }
     const finish = () => {
       if (finished) return
       finished = true
@@ -687,8 +832,13 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
       const dt = now - last
       if (last && dt < 250) {
         frameAvg = frameAvg ? frameAvg * 0.9 + dt * 0.1 : dt
-        if (frameAvg > 26 && dpr > 0.8 && now - dropAt > 700) {
-          dpr = Math.max(0.8, dpr - 0.35)
+        /* In 0.2 steps, not 0.35: a third of the resolution shed in one go is
+           itself a visible event — the whole frame goes soft mid-fall, which
+           reads as the glitch it was trying to prevent. Small steps settle onto
+           the level the machine can actually hold, and each one costs a
+           framebuffer reallocation, so the cooldown stays generous. */
+        if (frameAvg > 26 && dpr > 0.75 && now - dropAt > 700) {
+          dpr = Math.max(0.75, dpr - 0.2)
           renderer.setPixelRatio(dpr)
           resize()
           frameAvg = 0
@@ -725,7 +875,8 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
       decks.forEach((cl, n) => {
         cl.rotation.z = n * 1.7 + (now - start) * 0.0000096 * (n + 1)
       })
-      puffs.forEach((p) => p.quaternion.copy(camera.quaternion))
+      // the puffs turn to face the camera in their own vertex shader, so there
+      // is deliberately nothing to do for them here
 
       // the pillar only exists around sunrise itself: it fades in as the sun
       // reaches the horizon and is gone once the sun is properly clear of it
@@ -746,7 +897,7 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
         camera.fov = fovNow
         camera.updateProjectionMatrix()
       }
-      stars.style.opacity = String(1 - ss(0.06, 0.4, t))
+      lastStars = setStyle(stars, 'opacity', (1 - ss(0.06, 0.4, t)).toFixed(3), lastStars)
 
       /**
        * The mark rides ABOVE the weather. It blurs in as the sun crests, holds
@@ -760,13 +911,26 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
       if (logoWrapRef.current) {
         logoWrapRef.current.style.opacity = String(logoA)
         if (logoRef.current) {
+          // transform is compositor work and can move every frame for free
           logoRef.current.style.transform =
             `scale(${(1.12 - 0.12 * aIn).toFixed(4)}) ` +
             `translateY(${((1 - aIn) * 16 - (1 - aOut) * 34).toFixed(2)}px)`
-          logoRef.current.style.filter =
-            `blur(${(9 * (1 - aIn) + 8 * (1 - aOut)).toFixed(2)}px)` +
-            ` drop-shadow(0 0 24px rgba(255,244,214,${(0.5 * logoA).toFixed(3)}))` +
-            ` drop-shadow(0 2px 60px rgba(255,214,150,${(0.35 * logoA).toFixed(3)}))`
+          /* Quantised — a quarter-pixel of blur and a fiftieth of shadow alpha,
+             both well under what the eye resolves on a soft glow. What it buys
+             is the hold between the blur-in and the blur-out, a third of the
+             flight, where the mark is fully resolved and every frame used to
+             hand the compositor a *new* filter string describing the identical
+             result. Those frames now write nothing at all. */
+          const blur = (Math.round((9 * (1 - aIn) + 8 * (1 - aOut)) * 4) / 4).toFixed(2)
+          const g1 = (Math.round(0.5 * logoA * 50) / 50).toFixed(2)
+          const g2 = (Math.round(0.35 * logoA * 50) / 50).toFixed(2)
+          lastFilter = setStyle(
+            logoRef.current,
+            'filter',
+            `blur(${blur}px) drop-shadow(0 0 24px rgba(255,244,214,${g1}))` +
+              ` drop-shadow(0 2px 60px rgba(255,214,150,${g2}))`,
+            lastFilter,
+          )
         }
         if (haloRef.current) {
           haloRef.current.style.opacity = String(
@@ -797,7 +961,9 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
       white = Math.max(white, ramp * ramp)
       // inside the last deck and still falling: hold white, the hero has it now
       if (y < DECKS[2]) white = 1
-      if (fadeRef.current) fadeRef.current.style.opacity = String(Math.min(1, white))
+      if (fadeRef.current) {
+        lastFade = setStyle(fadeRef.current, 'opacity', Math.min(1, white).toFixed(3), lastFade)
+      }
 
       renderer.render(scene, camera)
 
@@ -811,7 +977,10 @@ export default function HeroIntroFlight({ onDone }: { onDone: () => void }) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       decks.forEach((d) => scene.remove(d))
-      puffs.forEach((p) => scene.remove(p))
+      puffBatches.forEach((p) => {
+        scene.remove(p)
+        p.dispose() // the instance buffers, which `disposables` never held
+      })
       disposables.forEach((d) => d.dispose())
       renderer.dispose()
       if (stars.parentNode === mount) mount.removeChild(stars)

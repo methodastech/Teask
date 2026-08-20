@@ -130,7 +130,15 @@ function makeApp(host, w, h, fov, z, opts) {
     sc.updateProjectionMatrix();
     key.shadow.bias = -0.0012; key.shadow.normalBias = 0.02; key.shadow.radius = 4;
   }
-  const app = { r, s, c, host, visible: true, update: null, hover: 0, hoverT: 0, px: 0, py: 0 };
+  /* visible:false to start, NOT true. Every one of these vignettes lives well
+     below the fold, but the observer below cannot report that until its first
+     callback — so each app got at least one frame rendered first, and a frame
+     is where three compiles the scene's shaders. Nine off-screen canvases each
+     linking a MeshStandardMaterial program came to 2.5 SECONDS of blocked main
+     thread under a profile, landing squarely on the hero's opening descent.
+     The observer always delivers an initial observation, so anything genuinely
+     on screen still starts drawing immediately. */
+  const app = { r, s, c, host, visible: false, update: null, hover: 0, hoverT: 0, px: 0, py: 0 };
   new IntersectionObserver(es => es.forEach(e => app.visible = e.isIntersecting), { rootMargin: "120px" }).observe(host);
   apps.push(app);
   return app;
