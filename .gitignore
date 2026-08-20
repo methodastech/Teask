@@ -5,6 +5,9 @@ dist/
 .env
 .env.*
 !.env.example
+# Tracked on purpose: VITE_ values are compiled into the public bundle, so none
+# of them are secret, and the live site is broken without this one.
+!.env.production
 
 # holds the database password
 api/config.php
