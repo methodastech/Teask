@@ -10,7 +10,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     // Honour a caller-assigned port (the preview harness sets PORT); vite does
-    // not read it on its own and would otherwise drift to 5174 when 5173 is busy.
-    port: process.env.PORT ? Number(process.env.PORT) : 5173,
+    // not read it on its own.
+    port: process.env.PORT ? Number(process.env.PORT) : 5175,
+    // Fail loudly rather than creeping to the next free port: a silent move
+    // leaves stale servers running and the wrong tab open.
+    strictPort: true,
   },
 })
